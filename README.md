@@ -1,108 +1,77 @@
-# 🪰 Fly-Melee: Conectoma Biológico de la Mosca × Super Smash Bros. Melee
+# 🪰 Fly-Melee: Una mosca real partiéndose la madre en Smash Bros Melee jaja
 
-> **Simulación biológica en tiempo real del conectoma cerebral completo de la mosca (*Drosophila melanogaster* - 395,144 neuronas LIF y ~73M sinapsis) controlando a Luigi y Fox en Super Smash Bros. Melee.**
+> *"¿Para qué curar enfermedades cuando puedes conectar 400,000 neuronas de una mosca de la fruta a un emulador de GameCube para que le haga Wavedash a la gente en el Melee?"*
 
----
+Literalmente agarramos el mapa cerebral biológico completo de una mosca de la fruta (*Drosophila melanogaster*, sacado del proyecto FlyWire / Princeton) y se lo enchufamos a Super Smash Bros. Melee para ver qué pasaba. 
 
-## 🌟 Características Principales
-
-- 🧠 **Conectoma Biológico Real (~400,000 Neuronas)**:
-  Reconstrucción biológica a partir del conectoma *FlyWire / MaleCNS*, estructurada en 8 clusters anatómicos (Cerebelar, VNC Motor, Central Complex, Dopaminérgico PAM, Octopaminérgico PPL1, Giant Fiber, etc.) con ~73 millones de sinapsis recurrentes.
-- ⚡ **Acelerador Sináptico CSC de Ultra Alta Velocidad**:
-  Multiplicación dispersa en formato *Compressed Sparse Column* (CSC) que procesa fotogramas neuronales en menos de 3.5 ms, garantizando **60 FPS estables** sin latencia de emulación.
-- 🟢 **Mapeo de Luigi 20XX (Wavedash Supremo & Shoryuken)**:
-  - Deslizamiento infinito con tracción **0.005**.
-  - *Sweetspot Up-B Shoryuken de Fuego* (Frame-8 Kill Confirm).
-  - *Green Missile Torpedo* recargable y defensivo.
-  - *Jab-Reset* Frame-2 y *D-Air Meteor Spike* en caza offstage.
-  - *L-Cancel* universal en suelo y plataformas.
-  - *ASDI Down* en hitstun con contraataque Crouch-Cancel.
-- 🦊 **Soporte de Fox McCloud (20XX Tech-Chase)**:
-  - Waveshine continuo y SHDL (*Short Hop Double Laser*).
-  - Drill multihit y recuperación con Fire Fox.
-- 🌐 **Panel Web 3D y Arena Interactiva en Tiempo Real** (`http://localhost:8085`):
-  - Visualización 3D WebGL con Three.js del cerebro anatómico de la mosca iluminando los circuitos sinápticos activos.
-  - Telemetría en vivo vía *Server-Sent Events* (SSE).
-  - Dinámica neuroquímica (*Dopamina PAM* y *Octopamina PPL1*).
-  - Mando virtual de GameCube animado con sticks analógicos y botones en tiempo real.
-  - Arena 2D de combate en tiempo real con marcadores, daño y vidas.
-- 🧬 **Entrenador Neural Acelerado vs Bots CPU Nivel 9**:
-  - Simula decenas de partidas en segundos contra 15 personajes de Melee (Marth, Falco, Sheik, Falcon, Peach, etc.).
-  - Neuroplasticidad STDP y memoria persistente a largo plazo guardada en `data/memory/long_term_synapses.json`.
-- 🎮 **Soporte Plug-and-Play de Mandos en Linux**:
-  - Detección y calibración automática de gamepads USB y Bluetooth genéricos para el Jugador 2 (Humano).
-  - Soporte de teclado (WASD / Flechas) sin dependencias adicionales.
+El resultado: la mosca aprendió a meter Shoryukens con Luigi a 60 FPS, spamear el Shine de Fox, hacer wavedash con tracción de mantequilla y hacerte burla en la cara. Cero seriedad, 100% diversión, risas y ciencia dudosa.
 
 ---
 
-## 🚀 Inicio Rápido
+## 🎮 ¿Cómo le pego una paliza a la mosca?
 
-### Menú Interactivo
-El lanzador central te permite ejecutar cualquier componente con un solo comando:
+Solo abre la terminal y dale:
 
 ```bash
 ./start_fly.sh
 ```
 
-Opciones disponibles en el menú:
-1. **Iniciar Panel Web 3D interactivo** (`http://localhost:8085`)
-2. **Ejecutar Test de Simulación Neural en Terminal**
-3. **Iniciar Dolphin: Mosca vs Humano (Tú en Puerto 2)**
-4. **Iniciar Dolphin: Mosca vs Bot CPU Nivel 9 (P2 automático)**
-5. **Abrir Slippi Launcher**
-6. **Detectar y Configurar Mando / Gamepad (USB o Bluetooth)**
-7. **Reparar Conexión de Mandos Bluetooth Genéricos en Linux**
-8. **Entrenamiento Neural Acelerado vs Bots Nivel 9**
+Te va a salir un menú chill:
+1. **Ver el panel web en vivo**: Abre `http://localhost:8085` para ver el cerebro 3D del bicho iluminándose en tiempo real mientras pelea.
+2. **Pelear tú contra la mosca**: Agarra tu teclado o conecta cualquier mando (USB o Bluetooth) y dale con todo (o déjate humillar por un insecto).
+3. **Poner a la mosca contra un Bot Nivel 9**: Siéntate con unas palomitas a ver si el cerebro de la mosca se hace un combo contra un Fox de la máquina.
+4. **Entrenamiento con esteroides**: La mosca se echa 50 partidas en 2 segundos contra bots para aprender tus mañas y memorizar combos.
 
 ---
 
-## 🖥️ Componentes del Proyecto
+## 🕹️ Controles pa' no morir en el intento (Tú en el Teclado)
 
-| Archivo | Descripción |
-|---|---|
-| [`fly_brain.py`](fly_brain.py) | Núcleo de simulación LIF, conectoma de 395k neuronas y decodificador biomecánico |
-| [`fly_melee.py`](fly_melee.py) | Puente directo entre Dolphin/Slippi, la Mosca (P1) y el Humano/CPU (P2) |
-| [`train_fly.py`](train_fly.py) | Entrenador acelerado de plasticidad y combate vs 15 personajes CPU Nivel 9 |
-| [`dashboard_server.py`](dashboard_server.py) | Servidor HTTP / SSE para el visualizador 3D y telemetría en tiempo real |
-| [`web/index.html`](web/index.html) | Panel 3D WebGL (Three.js), HUD de telemetría y arena virtual de combate |
-| [`detect_controller.py`](detect_controller.py) | Detector y configurador automático de gamepads USB/Bluetooth para Dolphin |
-| [`fix_bluetooth_gamepad.sh`](fix_bluetooth_gamepad.sh) | Script de ajuste BlueZ para mandos Android/inalámbricos genéricos |
-| [`verify_fixes.py`](verify_fixes.py) | Suite de verificación con 58 pruebas automáticas de biomecánica 20XX |
-| [`test_fly_brain.py`](test_fly_brain.py) | Benchmark y visualización de disparos neuronales en terminal |
-| [`fast_download.py`](fast_download.py) | Descargador multihilo acelerado para la ISO de Melee |
+Si no tienes mando de GameCube a mano, puedes jugar con tu teclado tranquilamente:
 
----
-
-## 🕹️ Controles para el Jugador Humano (Teclado)
-
-| Acción | Esquema A (WASD) | Esquema B (Flechas) | Mando GameCube |
+| ¿Qué quieres hacer? | Modo WASD (Gamer) | Modo Flechitas (Clásico) | Mando GameCube |
 |---|---|---|---|
-| **Moverse / Agacharse** | `W` `A` `S` `D` | `↑` `↓` `←` `→` | Stick Principal |
-| **Ataque Normal / Ficha** | `J` o `Espacio` | `X` o `Espacio` | Botón `A` |
-| **Ataque Especial** | `K` | `Z` | Botón `B` |
-| **Salto** | `U` o `I` | `C` o `V` | Botón `X` / `Y` |
-| **Agarre (Grab)** | `O` | `F` | Botón `Z` |
-| **Escudo (Shield)** | `L` | `Q` o `E` | Gatillo `L` / `R` |
-| **Start / Pausa** | `Enter` | `Enter` | Botón `Start` |
+| **Moverte / Agacharte** | `W` `A` `S` `D` | `↑` `↓` `←` `→` | Stick Principal |
+| **Pegar piña / Elegir muñeco** | `J` o `Espacio` | `X` o `Espacio` | Botón `A` |
+| **Poder especial** | `K` | `Z` | Botón `B` |
+| **Saltar** | `U` o `I` | `C` o `V` | Botón `X` / `Y` |
+| **Agarrar del pescuezo** | `O` | `F` | Botón `Z` |
+| **Escudo protector** | `L` | `Q` o `E` | Gatillo `L` / `R` |
+| **Pausa / Empezar** | `Enter` | `Enter` | Botón `Start` |
+
+*(Si conectas un mando de Xbox, PlayStation o GameCube por USB/Bluetooth, el script lo detecta y lo configura solo).*
 
 ---
 
-## 🧪 Pruebas y Verificación
+## 🧠 ¿Cómo carajos juega una mosca? (Explicación para mortales)
 
-Para ejecutar la suite de 58 pruebas biomecánicas y de seguridad:
-
-```bash
-python3 verify_fixes.py
-```
-
-Para ejecutar una sesión de entrenamiento neural de 50 partidas:
-
-```bash
-python3 train_fly.py 50 --character luigi --cpu 9
-```
+1. **Ojos de mosca (Fotorreceptores)**: La red calcula a qué velocidad te le estás acercando. Si te le tiras encima a lo loco, se le activan los mismos reflejos de supervivencia que usa para esquivar un periodicazo.
+2. **Dopamina al fallo (Modo Depredador)**:
+   - Si te conecta un combo o te saca del escenario, se le sube la dopamina al 100% y se pone ultra agresiva a buscar el remate.
+   - Si la matas, se le sube la octopamina (el equivalente a que una mosca entre en pánico) y juega a meter escudo y huir al centro.
+3. **Memoria biológica**: Guarda en un archivo `.json` tus hábitos. Si siempre ruedas hacia la misma esquina o te levantas igual, la mosca te lee la mente y te mete un Smash cargado.
 
 ---
 
-## 📜 Licencia
+## 🌐 Panel Web Estilo Omarchy (`http://localhost:8085`)
 
-Desarrollado para investigación de neurociencia computacional aplicada a inteligencia artificial en videojuegos competitivos.
+El panel web tiene estética **Omarchy** (limpio, minimalista, tonos esmeralda relajantes, esquinas redondeadas y cero pantallas de hacker de película noventera):
+- **Cerebro 3D interactivo**: Puedes girar y hacer zoom al conectoma para ver qué neuronas se encienden cuando salta o ataca.
+- **Arena Melee en 2D**: Mira el combate animado en tiempo real sin necesidad de abrir Dolphin.
+- **Mando GameCube en vivo**: Se mueven las palancas y los botones en la pantalla mostrando exactamente lo que el cerebro de la mosca manda por el cable.
+- **Selector de Personaje**: Haz clic en la insignia superior para alternar en vivo entre el resbaloso **Luigi SSS** y el agresivo **Fox McCloud 20XX**.
+
+---
+
+## 🧪 Pruebas automáticas (por si dudas del código)
+
+Si quieres verificar que todos los circuitos, combos y seguros anti-suicidios están bien:
+
+```bash
+/home/ltar/.venvs/pytorch/bin/python verify_fixes.py
+```
+*(62 de 62 pruebas pasando sin dramas).*
+
+---
+
+## 📜 Cosas nerds & Agradecimientos
+Proyecto hecho 100% por diversión y amor al Smash Melee. Basado en los datos de conectoma de FlyWire Consortium / Princeton Neuroscience Institute. Si te gana la mosca en partida rápida, no nos hacemos responsables de tu crisis existencial jaja.
