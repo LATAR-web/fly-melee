@@ -719,6 +719,12 @@ class FlyBrain:
                     dopamine_gain += 0.40
                 elif self.combo_state == "RUNNING_JC_UPSMASH":
                     dopamine_gain += 0.35
+                elif self.combo_state == "WAVESHINE_COMBO":
+                    dopamine_gain += 0.45
+                    self.learn_from_success("WAVESHINE")
+                elif getattr(self, "edgeguard_state", None) == "OFFSTAGE_SHINE":
+                    dopamine_gain += 0.50
+                    self.learn_from_success("OFFSTAGE_SHINE")
                 elif self.combo_state == "TECH_CHASE":
                     dopamine_gain += 0.30
                 elif getattr(self, "last_luigi_power", None) == "UPB_SHORYUKEN":
@@ -873,6 +879,11 @@ class FlyBrain:
         py = player.position.y
         on_ground = getattr(player, "on_ground", True)
 
+        # Detección del personaje activo (Fox o Luigi)
+        char_name = str(getattr(player, "character", getattr(self, "active_character", "LUIGI"))).upper()
+        is_fox = "FOX" in char_name and "LUIGI" not in char_name
+        is_luigi = not is_fox
+
         # EXCEPCIÓN CONTROLADA: Si Fox tiene activada la caza fuera de plataforma (Offstage Chase)
         # Fox puede salir deliberadamente a rematar (Shine-spike / B-Air wall) si y solo si:
         # Tiene su doble salto disponible (player.jumps_left > 0) y altura segura.
@@ -939,14 +950,23 @@ class FlyBrain:
 
         # --- B) EN EL AIRE SOBRE EL ESCENARIO: DRIFT DE SEGURIDAD Y CERO FREEFALLS ---
         if not on_ground and abs(px) <= stage_edge and py >= -2.0:
-            # En el aire sobre el escenario, NUNCA permitir Up-B (Shoryuken aéreo) ni Side-B
-            # porque dejan en SPECIAL_FALL (caída libre indefensa) que cae directo al abismo
             if action.get("special", False):
-                # Solo permitir proyectiles neutrales seguros (Neutral-B Bola de fuego / Láser)
-                if action.get("stick_y", 0.5) > 0.7 or action.get("stick_y", 0.5) < 0.3 or action.get("stick_x", 0.5) != 0.5:
-                    action["special"] = False
-                    action["attack"] = True
-                    action["stick_y"] = 0.5 # Convertir a N-Air Frame-3 seguro
+                if is_fox:
+                    # En Fox: Shine (Down-B, stick_y < 0.3) es 100% seguro (frame-1, jump-cancel, sin freefall).
+                    # Blaster (Neutral-B, stick_y ~0.5) es seguro para SHDL.
+                    # Prohibir solo Up-B (Fire Fox) en el aire sobre escenario para evitar enorme landing lag:
+                    if action.get("stick_y", 0.5) > 0.7:
+                        action["special"] = False
+                        action["attack"] = True
+                        action["stick_y"] = 0.5 # Convertir a N-Air seguro
+                else:
+                    # En Luigi: Cyclone (Down-B, stick_y < 0.3) es seguro (no freefall, mashable).
+                    # Bola de Fuego (Neutral-B) es segura.
+                    # Prohibir Up-B (Shoryuken aéreo) y Side-B en el aire sobre escenario (inducen SPECIAL_FALL suicida):
+                    if action.get("stick_y", 0.5) > 0.7 or (0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5):
+                        action["special"] = False
+                        action["attack"] = True
+                        action["stick_y"] = 0.5 # Convertir a N-Air Frame-3 seguro
 
             if px > (stage_edge - 10.0):
                 action["stick_x"] = min(float(action.get("stick_x", 0.5)), 0.20)
@@ -957,14 +977,21 @@ class FlyBrain:
                 if py > 6.0 and not action.get("special", False) and not action.get("jump", False):
                     action["stick_y"] = 0.0 # Fast fall para aterrizar rápido
 
-        # --- C) EN EL AIRE FUERA DEL ESCENARIO (OFFSTAGE): CERO GREEN MISSILE SUICIDAS ---
+        # --- C) EN EL AIRE FUERA DEL ESCENARIO (OFFSTAGE): GARANTÍA DE RECUPERACIÓN INTELIGENTE ---
         if not on_ground and (abs(px) > stage_edge or py < -2.0):
-            # Prohibir Side-B (Green Missile) en el aire fuera de escenario: causa FALL_SPECIAL suicida
-            if action.get("special", False) and 0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5:
-                if py > -18.0:
-                    action["stick_y"] = 0.0 # Convertir a Rising Cyclone seguro (no freefall)
-                else:
-                    action["stick_y"] = 0.90 # Convertir a Up-B snap a repisa
+            if is_luigi:
+                # Prohibir Side-B (Green Missile) en el aire fuera de escenario: causa FALL_SPECIAL suicida
+                if action.get("special", False) and 0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5:
+                    if py > -18.0:
+                        action["stick_y"] = 0.0 # Convertir a Rising Cyclone seguro (no freefall)
+                    else:
+                        action["stick_y"] = 0.90 # Convertir a Up-B snap a repisa
+            elif is_fox:
+                # En Fox: Fox Illusion (Side-B) es una opción de recuperación rápida válida cuando py >= -1.0.
+                # Si Fox está muy bajo (py < -1.0) y tenta Side-B, chocaría contra la pared inferior:
+                if action.get("special", False) and 0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5:
+                    if py < -1.0:
+                        action["stick_y"] = 0.90 # Convertir a Fire Fox Up-B para subir verticalmente a la repisa
 
         # Asegurar tipos numéricos para sticks
         action["stick_x"] = float(action.get("stick_x", 0.5))
@@ -2692,9 +2719,9 @@ class FlyBrain:
                     }, player, opponent, stage_edge=stage_edge)
                 elif jump_act == "AERIAL_CYCLONE":
                     return self._enforce_safety({
-                        "name": "🟢 N-AIR OFENSIVO FRAME-3: IMPACTO EN EL AIRE",
-                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "name": "🌪️ AERIAL LUIGI CYCLONE: VORTEX MULTIHIT",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 elif jump_act == "AERIAL_UPB":
                     return self._enforce_safety({

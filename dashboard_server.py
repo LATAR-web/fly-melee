@@ -64,6 +64,7 @@ class SimState:
         self.octopamine = 0.2
         self.stage_name = "Battlefield"
         self.stage_edge = 68.4
+        self.active_char = "LUIGI"
 
 class MockPos:
     def __init__(self, x=0.0, y=0.0):
@@ -132,12 +133,15 @@ def simulation_worker():
                     p1_vy = state.p1.get("vy", 0.0)
                     is_p1_ground = (p1_y <= 0.01)
 
+                    char_to_use = getattr(state, "active_char", "LUIGI").upper()
                     mock_p1 = MockPlayer(
                         x=p1_x, y=p1_y, on_ground=is_p1_ground,
                         action="JUMPING" if not is_p1_ground else ("RUNNING" if abs(p1_x) > 5 else "STANDING"),
                         percent=state.p1.get("percent", 0), stock=state.p1.get("stock", 4)
                     )
-                    mock_p1.character = "LUIGI"
+                    mock_p1.character = char_to_use
+                    state.brain.active_character = char_to_use
+                    state.p1["name"] = f"{char_to_use.capitalize()} (Mosca)"
                     mock_p1.speed_y_self = p1_vy
                     mock_p2 = MockPlayer(
                         x=p2_x, y=state.p2.get("y", 0.0), on_ground=True,
@@ -323,6 +327,24 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                         state.manual_override = True
                 except ValueError:
                     pass
+            resp_body = b'{"status":"ok"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp_body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(resp_body)
+            return
+
+        elif path == "/api/set_character":
+            qs = parse_qs(parsed.query)
+            if "char" in qs:
+                c = qs["char"][0].strip().upper()
+                if c in ["FOX", "LUIGI"]:
+                    with state.lock:
+                        state.active_char = c
+                        state.brain.active_character = c
+                        state.p1["name"] = f"{c.capitalize()} (Mosca)"
             resp_body = b'{"status":"ok"}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

@@ -1248,8 +1248,64 @@ def run_tests():
     assert not act_plat_squat_exit["attack"] and act_plat_squat_exit["stick_x"] == 1.0 and act_plat_squat_exit["stick_y"] == 0.5
     print("✅ TEST 58 SUPERADO: Luigi desciende de plataformas sin quedarse atascado agachado ni spamear ataques terrestres.")
 
+    # -------------------------------------------------------------
+    # TEST 59: Fox Aerial Shine sobre Escenario (Preservación de Shine 20XX)
+    # -------------------------------------------------------------
+    print("\n--- Test 59: Fox Aerial Shine sobre Escenario ---")
+    p_fox_air = MockPlayer(x=10.0, y=15.0, on_ground=False, action="FALLING", act_val=29)
+    p_fox_air.character = "FOX"
+    raw_shine = {
+        "name": "TEST AERIAL SHINE", "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5
+    }
+    safe_fox_shine = brain._enforce_safety(dict(raw_shine), p_fox_air, p_opp_distance, stage_edge=68.4)
+    print(f"Fox Aerial Shine: Special={safe_fox_shine['special']}, Attack={safe_fox_shine['attack']}, Stick Y={safe_fox_shine['stick_y']}")
+    assert safe_fox_shine["special"] and not safe_fox_shine["attack"] and safe_fox_shine["stick_y"] == 0.0, "El Reflector Shine de Fox en el aire no debe ser convertido a N-Air"
+    print("✅ TEST 59 SUPERADO: Fox ejecuta su Reflector Shine aéreo frame-1 libremente sobre el escenario.")
+
+    # -------------------------------------------------------------
+    # TEST 60: Fox Offstage High Recovery (Fox Illusion Preservado)
+    # -------------------------------------------------------------
+    print("\n--- Test 60: Fox Offstage High Recovery con Fox Illusion ---")
+    p_fox_offstage_high = MockPlayer(x=85.0, y=5.0, on_ground=False, action="FALLING", act_val=29)
+    p_fox_offstage_high.character = "FOX"
+    p_fox_offstage_high.jumps_left = 0
+    raw_illusion = {
+        "name": "⚡ FOX ILLUSION (Side-B HORIZONTAL ALTO)", "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+        "stick_x": 0.0, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5
+    }
+    safe_fox_illusion = brain._enforce_safety(dict(raw_illusion), p_fox_offstage_high, p_opp_distance, stage_edge=68.4)
+    print(f"Fox Illusion Recovery: Special={safe_fox_illusion['special']}, Stick X={safe_fox_illusion['stick_x']}, Stick Y={safe_fox_illusion['stick_y']}")
+    assert safe_fox_illusion["special"] and safe_fox_illusion["stick_y"] == 0.5 and safe_fox_illusion["stick_x"] == 0.0, "Fox Illusion a gran altura debe permitirse para retorno horizontal rápido"
+    print("✅ TEST 60 SUPERADO: Fox recupera horizontalmente con Fox Illusion sin ser congelado con Shine en el abismo.")
+
+    # -------------------------------------------------------------
+    # TEST 61: Fox Offstage Low Recovery (Conversión Segura a Fire Fox)
+    # -------------------------------------------------------------
+    print("\n--- Test 61: Fox Offstage Low Recovery a Fire Fox ---")
+    p_fox_offstage_low = MockPlayer(x=85.0, y=-15.0, on_ground=False, action="FALLING", act_val=29)
+    p_fox_offstage_low.character = "FOX"
+    p_fox_offstage_low.jumps_left = 0
+    safe_fox_low = brain._enforce_safety(dict(raw_illusion), p_fox_offstage_low, p_opp_distance, stage_edge=68.4)
+    print(f"Fox Low Recovery: Special={safe_fox_low['special']}, Stick Y={safe_fox_low['stick_y']}")
+    assert safe_fox_low["special"] and safe_fox_low["stick_y"] == 0.90, "Side-B a baja altura debe convertirse a Up-B Fire Fox para elevarse a la repisa"
+    print("✅ TEST 61 SUPERADO: Fox convierte Side-B bajo a Fire Fox Up-B para evitar chocar contra la pared lateral.")
+
+    # -------------------------------------------------------------
+    # TEST 62: Luigi Aerial Cyclone Buffer Execution
+    # -------------------------------------------------------------
+    print("\n--- Test 62: Luigi Aerial Cyclone Buffer Execution ---")
+    p_luigi_cyclone = MockPlayer(x=0.0, y=12.0, on_ground=False, action="JUMPING", act_val=25)
+    p_luigi_cyclone.character = "LUIGI"
+    brain._set_luigi_jump("AERIAL_CYCLONE", 990)
+    act_aerial_cyclone = brain.get_luigi_decision(player=p_luigi_cyclone, opponent=p_opp_ground_far, current_frame=990, stage="BATTLEFIELD")
+    print(f"Luigi Aerial Cyclone: {act_aerial_cyclone['name']} | Special={act_aerial_cyclone['special']}, Stick Y={act_aerial_cyclone['stick_y']}")
+    assert act_aerial_cyclone["special"] and not act_aerial_cyclone["attack"] and act_aerial_cyclone["stick_y"] == 0.0
+    assert "CYCLONE" in act_aerial_cyclone["name"]
+    print("✅ TEST 62 SUPERADO: Luigi ejecuta correctamente su Cyclone aéreo cuando fue seleccionado en salto.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (58/58 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (62/62 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

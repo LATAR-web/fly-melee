@@ -610,7 +610,7 @@
   <header>
     <div class="header-title">
       <span>[TERMINAL://FLYWIRE_400K] × MELEE_SYS</span>
-      <span class="badge badge-fox" id="p1-badge">[🟢 LUIGI_SSS]</span>
+      <span class="badge badge-fox" id="p1-badge" onclick="toggleCharacter()" style="cursor:pointer;" title="Click para alternar entre Luigi y Fox McCloud">[🟢 LUIGI_SSS]</span>
       <span class="badge badge-neurons">[LIF: 395,144]</span>
       <span class="badge" id="stage-badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid #c084fc;">[STAGE: BATTLEFIELD]</span>
       <span class="badge badge-live" id="live-badge">[● AWAIT_DOLPHIN]</span>
@@ -1765,6 +1765,13 @@
         console.error("Error procesando telemetría SSE:", err);
       }
     };
+
+    // Alternar personaje de la mosca en vivo (Luigi <-> Fox)
+    function toggleCharacter() {
+      const isLuigi = (gameState && gameState.p1 && gameState.p1.name) ? gameState.p1.name.toLowerCase().includes('luigi') : true;
+      const targetChar = isLuigi ? 'fox' : 'luigi';
+      fetch(`/api/set_character?char=${targetChar}`).catch(() => {});
+    }
 
     // Slider de amenaza interactivo
     const threatSlider = document.getElementById('threat-slider');
