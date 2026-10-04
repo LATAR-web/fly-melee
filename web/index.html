@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🪰 Conectoma de la Mosca (400k) × Super Smash Bros Melee</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #06090e;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Top Header Bar */
+    header {
+      height: 48px;
+      background: #0d1117;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 100;
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: normal;
+    }
+    .badge-fox { background: #1f6feb; color: #fff; }
+    .badge-neurons { background: #238636; color: #fff; }
+    .badge-live { background: #da3633; color: #fff; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    
+    .view-toggles {
+      display: flex;
+      gap: 8px;
+    }
+    .view-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .view-btn.active, .view-btn:hover {
+      background: #388bfd;
+      color: #fff;
+      border-color: #388bfd;
+    }
+
+    /* Main Container (Split Screen) */
+    #main-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Left: 3D Fly Brain & Exoskeleton (Oculto por defecto, solo visible si se pulsa 'Ver Cerebro 3D') */
+    #pane-brain {
+      display: none;
+      flex: 1;
+      position: relative;
+      border-right: 1px solid #30363d;
+      background: radial-gradient(circle at center, #071022 0%, #020617 100%);
+      transition: all 0.3s ease;
+    }
+    #canvas-3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    /* Right: Melee Battlefield Arena */
+    #pane-arena {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s ease;
+    }
+    
+    /* HUD Overlays for 3D View */
+    .brain-hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: rgba(13, 17, 23, 0.88);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      width: 250px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .brain-metric {
+      display: flex;
+      justify-content: space-between;
+      margin: 3px 0;
+      color: #8b949e;
+    }
+    .brain-metric span.val { color: #58a6ff; font-weight: bold; }
+
+    /* Neural Circuits Activity Monitor */
+    .circuit-hud {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(13, 17, 23, 0.9);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .circuit-hud-title {
+      font-weight: bold;
+      color: #94a3b8;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .circuit-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #64748b;
+      transition: all 0.15s ease-out;
+    }
+    .circuit-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #334155;
+      transition: all 0.15s ease-out;
+    }
+    .circuit-item.active-optic { color: #38bdf8; font-weight: bold; }
+    .circuit-item.active-optic .circuit-dot { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+    .circuit-item.active-gf { color: #22c55e; font-weight: bold; }
+    .circuit-item.active-gf .circuit-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .circuit-item.active-attack { color: #f59e0b; font-weight: bold; }
+    .circuit-item.active-attack .circuit-dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+    .circuit-item.active-special { color: #6366f1; font-weight: bold; }
+    .circuit-item.active-special .circuit-dot { background: #6366f1; box-shadow: 0 0 8px #6366f1; }
+    .circuit-item.active-shield { color: #ec4899; font-weight: bold; }
+    .circuit-item.active-shield .circuit-dot { background: #ec4899; box-shadow: 0 0 8px #ec4899; }
+    .circuit-item.active-combo { color: #a855f7; font-weight: bold; }
+    .circuit-item.active-combo .circuit-dot { background: #a855f7; box-shadow: 0 0 10px #a855f7; }
+    .circuit-item.active-pam { color: #facc15; font-weight: bold; }
+    .circuit-item.active-pam .circuit-dot { background: #facc15; box-shadow: 0 0 8px #facc15; }
+    .circuit-item.active-ppl1 { color: #ef4444; font-weight: bold; }
+    .circuit-item.active-ppl1 .circuit-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+    /* Scoreboard in Melee Arena */
+    .arena-scoreboard {
+      height: 60px;
+      background: rgba(13, 17, 23, 0.95);
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .player-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .p1-icon, .p2-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #1f6feb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 10px rgba(31, 111, 235, 0.4);
+    }
+    .p2-icon {
+      background: #da3633;
+      box-shadow: 0 0 10px rgba(218, 54, 51, 0.4);
+    }
+    .player-name {
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .p1-name { color: #58a6ff; }
+    .p2-name { color: #f85149; }
+    .player-percent {
+      font-size: 22px;
+      font-weight: 900;
+      font-family: monospace;
+      line-height: 1;
+    }
+    .player-stocks {
+      font-size: 12px;
+      color: #facc15;
+    }
+    
+    #action-banner {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #3b82f6;
+      color: #60a5fa;
+      box-shadow: 0 0 14px rgba(59, 130, 246, 0.3);
+      text-align: center;
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Arena Viewport */
+    #arena-canvas-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+    #arena-canvas {
+      width: 100%;
+      height: 100%;
+      max-height: 440px;
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      display: block;
+    }
+    
+    /* Bottom Controls & Controller HUD */
+    .arena-bottom {
+      background: #0d1117;
+      border-top: 1px solid #30363d;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .interactive-slider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .interactive-slider input {
+      width: 130px;
+      cursor: pointer;
+    }
+    
+    /* Authentic GameCube Controller Visualization */
+    .gc-controller-container {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #111827;
+      padding: 6px 14px;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .gc-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #9ca3af;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Stick Gate (Octagonal Bezel) */
+    .stick-gate {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #1f2937;
+      border: 2px solid #4b5563;
+      position: relative;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .stick-cross {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.25;
+    }
+    .stick-cross::before {
+      content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: #9ca3af;
+    }
+    .stick-cross::after {
+      content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: #9ca3af;
+    }
+    .main-stick-knob {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #94a3b8 0%, #475569 100%);
+      border: 1px solid #cbd5e1;
+      position: absolute;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      transition: transform 0.04s ease-out;
+    }
+    .c-stick-knob {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fde047 0%, #ca8a04 100%);
+      border: 1px solid #fef08a;
+      position: absolute;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      transition: transform 0.04s ease-out;
+    }
+    
+    /* GameCube Buttons Cluster */
+    .gc-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-a {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #15803d;
+      color: #dcfce7;
+      font-weight: 900;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #16a34a;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      transition: all 0.1s ease;
+    }
+    .btn-a.active {
+      background: #22c55e;
+      color: #ffffff;
+      box-shadow: 0 0 12px #22c55e;
+      transform: scale(0.92);
+    }
+    .btn-b {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #b91c1c;
+      color: #fee2e2;
+      font-weight: 900;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #dc2626;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      transition: all 0.1s ease;
+    }
+    .btn-b.active {
+      background: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 0 12px #ef4444;
+      transform: scale(0.92);
+    }
+    .btn-xy {
+      width: 14px;
+      height: 22px;
+      border-radius: 8px;
+      background: #475569;
+      color: #f1f5f9;
+      font-weight: 800;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #64748b;
+      transition: all 0.1s ease;
+    }
+    .btn-xy.active {
+      background: #a855f7;
+      color: #ffffff;
+      box-shadow: 0 0 10px #a855f7;
+      transform: scale(0.92);
+    }
+    .btn-z {
+      width: 22px;
+      height: 14px;
+      border-radius: 6px;
+      background: #4338ca;
+      color: #e0e7ff;
+      font-weight: 800;
+      font-size: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #6366f1;
+      transition: all 0.1s ease;
+    }
+    .btn-z.active {
+      background: #818cf8;
+      box-shadow: 0 0 10px #818cf8;
+    }
+    .btn-trigger {
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #334155;
+      color: #94a3b8;
+      font-weight: 800;
+      font-size: 9px;
+      border: 1px solid #475569;
+      transition: all 0.1s ease;
+    }
+    .btn-trigger.active {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 0 10px #38bdf8;
+    }
+
+    /* Live Execution HUD Card on 3D Brain View */
+    .execution-card {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(15, 23, 42, 0.90);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 250px;
+      max-width: 340px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65), 0 0 16px rgba(56, 189, 248, 0.25);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      pointer-events: none;
+    }
+    .exec-header {
+      font-size: 10px;
+      font-weight: 800;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .exec-action-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #f8fafc;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      margin-bottom: 4px;
+    }
+    .exec-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .exec-inputs {
+      font-size: 11px;
+      font-family: monospace;
+      color: #a5f3fc;
+      background: rgba(8, 145, 178, 0.15);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header>
+    <div class="header-title">
+      <span>🪰 Conectoma Mosca (400k) × Melee</span>
+      <span class="badge badge-fox" id="p1-badge">🟢 Luigi SSS Tier</span>
+      <span class="badge badge-neurons">395,144 Neuronas LIF (~73.0M Sinapsis)</span>
+      <span class="badge" id="stage-badge" style="background:#8b5cf6; color:#fff;">🏟️ Battlefield</span>
+      <span class="badge badge-live" id="live-badge">● ESPERANDO DOLPHIN...</span>
+    </div>
+    <div class="view-toggles">
+      <button class="view-btn active" id="btn-arena" onclick="setView('arena')">⚔️ Arena Melee (Mosca vs Tú)</button>
+      <button class="view-btn" id="btn-brain" onclick="setView('brain')">🧠 Ver Cerebro 3D</button>
+      <button class="view-btn" id="btn-split" onclick="setView('split')">⚡ Vista Dual (Ambos)</button>
+      <button class="view-btn" id="btn-reset-cam" onclick="resetBrainView()" title="Centrar cámara" style="display:none;">🎯 Centrar</button>
+    </div>
+  </header>
+
+  <!-- Main Viewport Area -->
+  <div id="main-container">
+    
+    <!-- Left Pane: 3D Fly Brain & Anatomical Fly Exoskeleton -->
+    <div id="pane-brain">
+      <canvas id="canvas-3d"></canvas>
+
+      <!-- Live Execution Card (Answers user's request: 'quiero ver el cerebro completo y que ejecuta') -->
+      <div class="execution-card" id="execution-card">
+        <div class="exec-header">⚡ EJECUCIÓN EN TIEMPO REAL</div>
+        <div class="exec-action-title" id="exec-action-title">🦊 FOX EN GUARDIA</div>
+        <div class="exec-sub" id="exec-sub">Circuito: Conectoma 395,144 LIF</div>
+        <div class="exec-inputs" id="exec-inputs-hud">🎮 Stick: (0.50, 0.50) | Botones: <strong style="color:#facc15;">NINGUNO</strong></div>
+      </div>
+      
+      <!-- Top Left Brain Metrics -->
+      <div class="brain-hud">
+        <h4 style="color:#58a6ff; margin-bottom:5px;">🧠 Conectoma Drosophila Expandido</h4>
+        <div class="brain-metric"><span>Neuronas biológicas:</span><span class="val">395,144</span></div>
+        <div class="brain-metric"><span>Sinapsis computadas:</span><span class="val">~73.0M</span></div>
+        <div class="brain-metric"><span>Frecuencia simulación:</span><span class="val" id="val-fps">60 FPS</span></div>
+        <div class="brain-metric"><span>Dopamina PAM (Ataque):</span><span class="val" id="val-dopa" style="color:#facc15;">50%</span></div>
+        <div class="brain-metric"><span>Octopamina PPL1 (Alerta):</span><span class="val" id="val-octo" style="color:#f87171;">20%</span></div>
+        <div class="brain-metric"><span>Racha de Combos:</span><span class="val" id="val-combo" style="color:#22c55e;">0</span></div>
+        <div class="brain-metric"><span>Amenaza visual:</span><span class="val" id="val-threat">0%</span></div>
+        <div class="brain-metric" style="border-top:1px solid #30363d; margin-top:4px; padding-top:4px;">
+          <span>💾 Memoria Persistente:</span><span class="val" style="color:#38bdf8;">ACTIVA (DISCO)</span>
+        </div>
+        <div class="brain-metric"><span>Partidas Aprendidas:</span><span class="val" id="val-matches" style="color:#a855f7;">0</span></div>
+        <div class="brain-metric"><span>Aversión al Borde:</span><span class="val" id="val-edge-fear" style="color:#ef4444;">1.35x</span></div>
+        <div class="brain-metric"><span>Maestría de Combos:</span><span class="val" id="val-combo-mastery" style="color:#22c55e;">1.20x</span></div>
+      </div>
+
+      <!-- Bottom Left Live Circuits Lighting Monitor -->
+      <div class="circuit-hud">
+        <div class="circuit-hud-title">⚡ Circuitos Neuronales Activos:</div>
+        <div class="circuit-item" id="c-optic"><div class="circuit-dot"></div><span>👁️ Fotorreceptores / Óptico (C0)</span></div>
+        <div class="circuit-item" id="c-pam"><div class="circuit-dot"></div><span>🧠 Dopamina PAM (Recompensa C1)</span></div>
+        <div class="circuit-item" id="c-ppl1"><div class="circuit-dot"></div><span>⚡ Octopamina PPL1 (Supervivencia C1)</span></div>
+        <div class="circuit-item" id="c-gf"><div class="circuit-dot"></div><span>🦘 Giant Fiber (DNp01 / Salto C2)</span></div>
+        <div class="circuit-item" id="c-attack"><div class="circuit-dot"></div><span>⚔️ Motor Ataque (A / Up-Smash C2)</span></div>
+        <div class="circuit-item" id="c-special"><div class="circuit-dot"></div><span>⚡ Motor Especial (B / Shine C2)</span></div>
+        <div class="circuit-item" id="c-shield"><div class="circuit-dot"></div><span>🛡️ Protección / Teching (L C2)</span></div>
+        <div class="circuit-item" id="c-combo"><div class="circuit-dot"></div><span>💥 Cerebelo de Combos / Techs (C3)</span></div>
+      </div>
+    </div>
+
+    <!-- Right Pane: Super Smash Bros Melee Battlefield Arena -->
+    <div id="pane-arena">
+      <!-- Arena Scoreboard: Luigi / Fox (La Mosca) vs Jugador (Tú) -->
+      <div class="arena-scoreboard">
+        <div class="player-card">
+          <div class="p1-icon" id="p1-icon">🪰</div>
+          <div>
+            <div class="player-name p1-name" id="p1-name-label">LUIGI (La Mosca 400k)</div>
+            <div class="player-percent" id="p1-pct" style="color:#f8fafc;">0%</div>
+            <div class="player-stocks" id="p1-stocks">⭐⭐⭐⭐</div>
+          </div>
+        </div>
+
+        <div id="action-banner">⚡ INICIALIZANDO MOSCA...</div>
+
+        <div class="player-card" style="flex-direction:row-reverse; text-align:right;">
+          <div class="p2-icon">👤</div>
+          <div>
+            <div class="player-name p2-name" id="p2-name-label">JUGADOR (Tú)</div>
+            <div class="player-percent" id="p2-pct" style="color:#f8fafc;">0%</div>
+            <div class="player-stocks" id="p2-stocks">⭐⭐⭐⭐</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Battlefield -->
+      <div id="arena-canvas-container">
+        <canvas id="arena-canvas" width="960" height="520"></canvas>
+      </div>
+
+      <!-- Bottom Status & GameCube Controller Widget -->
+      <div class="arena-bottom">
+        <div class="interactive-slider">
+          <span>Amenaza / Distancia:</span>
+          <input type="range" id="threat-slider" min="5" max="80" value="35">
+          <span id="slider-val" style="color:#58a6ff; font-weight:bold;">35u</span>
+        </div>
+
+        <!-- Authentic GameCube Controller Visualization -->
+        <div class="gc-controller-container">
+          <span class="gc-label" id="gc-p1-label">MANDO MOSCA:</span>
+          
+          <!-- L Trigger -->
+          <div class="btn-trigger" id="btn-l">L</div>
+
+          <!-- Main Stick (Moving in Real Time) -->
+          <div class="stick-gate" title="Main Analog Stick">
+            <div class="stick-cross"></div>
+            <div class="main-stick-knob" id="main-stick"></div>
+          </div>
+
+          <!-- C-Stick (Smash Attacks) -->
+          <div class="stick-gate" title="C-Stick" style="width:36px; height:36px;">
+            <div class="stick-cross"></div>
+            <div class="c-stick-knob" id="c-stick"></div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="gc-buttons">
+            <div class="btn-b" id="btn-b" title="B (Especial)">B</div>
+            <div class="btn-a" id="btn-a" title="A (Ataque)">A</div>
+            <div class="btn-xy" id="btn-y" title="Y (Salto)">Y</div>
+            <div class="btn-z" id="btn-z" title="Z (Agarre)">Z</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts: Three.js 3D Brain & Fly Model + 2D Arena Canvas -->
+  <script src="/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    // 1. Layout View Switching (Arena, Cerebro 3D o Vista Dual lado a lado)
+    const paneBrain = document.getElementById('pane-brain');
+    const paneArena = document.getElementById('pane-arena');
+    const btnBrain = document.getElementById('btn-brain');
+    const btnArena = document.getElementById('btn-arena');
+    const btnSplit = document.getElementById('btn-split');
+    const btnResetCam = document.getElementById('btn-reset-cam');
+
+    function setView(mode) {
+      if (btnBrain) btnBrain.classList.remove('active');
+      if (btnArena) btnArena.classList.remove('active');
+      if (btnSplit) btnSplit.classList.remove('active');
+
+      if (mode === 'brain') {
+        paneBrain.style.display = 'block';
+        paneArena.style.display = 'none';
+        paneBrain.style.flex = '1';
+        if (btnBrain) btnBrain.classList.add('active');
+        if (btnResetCam) btnResetCam.style.display = 'inline-block';
+      } else if (mode === 'split') {
+        paneBrain.style.display = 'block';
+        paneArena.style.display = 'flex';
+        paneBrain.style.flex = '1';
+        paneArena.style.flex = '1';
+        if (btnSplit) btnSplit.classList.add('active');
+        if (btnResetCam) btnResetCam.style.display = 'inline-block';
+      } else {
+        // Vista única oficial: Fox (Mosca) vs Tú (Jugador Humano)
+        paneBrain.style.display = 'none';
+        paneArena.style.display = 'flex';
+        paneArena.style.flex = '1';
+        if (btnArena) btnArena.classList.add('active');
+        if (btnResetCam) btnResetCam.style.display = 'none';
+      }
+      setTimeout(onWindowResize, 60);
+    }
+
+    // 2. Three.js 3D Brain & Anatomical Fly Exoskeleton
+    const container = document.getElementById('pane-brain');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020617, 0.001);
+
+    const safeInitW = container.clientWidth || 800;
+    const safeInitH = container.clientHeight || 600;
+    const camera = new THREE.PerspectiveCamera(45, safeInitW / safeInitH, 1, 3000);
+    camera.position.set(0, 10, 470);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas-3d'), antialias: true, alpha: true });
+    renderer.setSize(safeInitW, safeInitH);
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+
+    // Iluminación
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+    dirLight.position.set(200, 300, 400);
+    scene.add(dirLight);
+
+    // Grupo de la Mosca (Cerebro + Exoesqueleto)
+    const flyGroup = new THREE.Group();
+    flyGroup.rotation.set(0.08, 0, 0); // Orientación frontal estable sin giros mareantes
+    scene.add(flyGroup);
+
+    // Construcción del Exoesqueleto 3D de la Mosca
+    const flyExoGroup = new THREE.Group();
+    flyExoGroup.scale.set(0.68, 0.68, 0.68);
+    flyExoGroup.position.set(0, -10, 0);
+    flyGroup.add(flyExoGroup);
+
+    const exoMat = new THREE.MeshPhongMaterial({
+      color: 0x0a192f,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.15,
+      transparent: true,
+      opacity: 0.22,
+      shininess: 80,
+      depthWrite: false
+    });
+
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false
+    });
+
+    const eyeMat = new THREE.MeshPhongMaterial({
+      color: 0xd97706,
+      emissive: 0xef4444,
+      emissiveIntensity: 0.45,
+      transparent: true,
+      opacity: 0.55,
+      wireframe: true,
+      depthWrite: false
+    });
+
+    // Cabeza
+    const headGeo = new THREE.SphereGeometry(140, 24, 20);
+    headGeo.scale(1.15, 0.9, 0.95);
+    const headMesh = new THREE.Mesh(headGeo, exoMat);
+    const headWire = new THREE.Mesh(headGeo, wireMat);
+    flyExoGroup.add(headMesh);
+    flyExoGroup.add(headWire);
+
+    // Grandes Ojos Compuestos (Rojo Rubí / Ámbar)
+    const eyeGeoL = new THREE.SphereGeometry(68, 18, 14);
+    eyeGeoL.scale(0.85, 1.25, 1.1);
+    const eyeL = new THREE.Mesh(eyeGeoL, eyeMat);
+    eyeL.position.set(-135, 10, 20);
+    eyeL.rotation.z = 0.25;
+    flyExoGroup.add(eyeL);
+
+    const eyeGeoR = eyeGeoL.clone();
+    const eyeR = new THREE.Mesh(eyeGeoR, eyeMat);
+    eyeR.position.set(135, 10, 20);
+    eyeR.rotation.z = -0.25;
+    flyExoGroup.add(eyeR);
+
+    // Antenas (Aristas)
+    const antennaMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 });
+    function createAntenna(side) {
+      const points = [
+        new THREE.Vector3(side * 25, 45, 120),
+        new THREE.Vector3(side * 45, 95, 175),
+        new THREE.Vector3(side * 65, 155, 215)
+      ];
+      const curve = new THREE.CatmullRomCurve3(points);
+      const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(20));
+      return new THREE.Line(geo, antennaMat);
+    }
+    flyExoGroup.add(createAntenna(-1));
+    flyExoGroup.add(createAntenna(1));
+
+    // Tórax
+    const thoraxGeo = new THREE.SphereGeometry(165, 24, 20);
+    thoraxGeo.scale(0.95, 1.0, 1.25);
+    const thoraxMesh = new THREE.Mesh(thoraxGeo, exoMat);
+    thoraxMesh.position.set(0, -95, -110);
+    const thoraxWire = new THREE.Mesh(thoraxGeo, wireMat);
+    thoraxWire.position.set(0, -95, -110);
+    flyExoGroup.add(thoraxMesh);
+    flyExoGroup.add(thoraxWire);
+
+    // Alas Translúcidas Iridiscentes
+    const wingMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const wingWireMat = new THREE.MeshBasicMaterial({
+      color: 0xa855f7,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide
+    });
+
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 0);
+    wingShape.bezierCurveTo(45, 120, 140, 260, 120, 380);
+    wingShape.bezierCurveTo(90, 410, 20, 390, -40, 260);
+    wingShape.bezierCurveTo(-50, 150, -20, 60, 0, 0);
+    const wingGeo = new THREE.ShapeGeometry(wingShape);
+
+    const wingL = new THREE.Mesh(wingGeo, wingMat);
+    const wingLWire = new THREE.Mesh(wingGeo, wingWireMat);
+    wingL.add(wingLWire);
+    wingL.position.set(-65, -45, -130);
+    wingL.rotation.set(Math.PI / 2.3, -0.4, -0.6);
+    flyExoGroup.add(wingL);
+
+    const wingR = new THREE.Mesh(wingGeo, wingMat);
+    const wingRWire = new THREE.Mesh(wingGeo, wingWireMat);
+    wingR.add(wingRWire);
+    wingR.position.set(65, -45, -130);
+    wingR.rotation.set(Math.PI / 2.3, 0.4, 0.6);
+    wingR.scale.set(-1, 1, 1);
+    flyExoGroup.add(wingR);
+
+    // Abdomen Segmentado
+    for (let s = 0; s < 5; s++) {
+      const segGeo = new THREE.CylinderGeometry(110 - s * 16, 125 - s * 16, 42, 20, 1, true);
+      const segMesh = new THREE.Mesh(segGeo, exoMat);
+      const segWire = new THREE.Mesh(segGeo, wireMat);
+      segMesh.position.set(0, -190 - s * 38, -195 - s * 45);
+      segMesh.rotation.x = 0.55;
+      segWire.position.copy(segMesh.position);
+      segWire.rotation.copy(segMesh.rotation);
+      flyExoGroup.add(segMesh);
+      flyExoGroup.add(segWire);
+    }
+
+    // Toggle Exoesqueleto (Por defecto OFF para apreciar el conectoma completo y transparente)
+    let showExoskeleton = false;
+    flyExoGroup.visible = false;
+    function toggleExoskeleton() {
+      showExoskeleton = !showExoskeleton;
+      flyExoGroup.visible = showExoskeleton;
+      const btn = document.getElementById('btn-toggle-exo');
+      if (btn) btn.textContent = showExoskeleton ? "🪰 Con Exoesqueleto" : "🧠 Solo Conectoma";
+    }
+
+    // Cargar Conectoma de 197,572 Neuronas LIF (4 Clusters Anatómicos)
+    let pointCloud = null;
+    let baseColors = null;
+    let dynamicColors = null;
+    let activeFlashes = [];
+    let numNeurons = 0;
+
+    fetch('/soma_norm_400k.f32')
+      .then(r => {
+        if (!r.ok) return fetch('/soma_norm_197k.f32');
+        return r;
+      })
+      .then(r => {
+        if (!r.ok) return fetch('/soma_norm_139k.f32');
+        return r;
+      })
+      .then(r => {
+        if (!r.ok) return fetch('/soma_norm.f32');
+        return r;
+      })
+      .then(r => r.arrayBuffer())
+      .then(buf => {
+        const floatData = new Float32Array(buf);
+        numNeurons = floatData.length / 3;
+        const is400k = numNeurons > 300000;
+        const is197k = numNeurons > 150000;
+        const is139k = numNeurons > 100000;
+        
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(floatData.length);
+        dynamicColors = new Float32Array(floatData.length);
+        baseColors = new Float32Array(floatData.length);
+
+        // 1. Calcular límites espaciales y centro anatómico exacto del conectoma
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+        for (let i = 0; i < floatData.length; i += 3) {
+          const x = floatData[i], y = floatData[i+1], z = floatData[i+2];
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+        const maxSpan = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1.0;
+        // Escala calibrada a 165 unidades: tamaño óptimo, no excesivo y perfectamente visible completo
+        const scaleFactor = 165.0 / maxSpan;
+
+        for (let i = 0; i < floatData.length; i += 3) {
+          positions[i]   = (floatData[i]   - centerX) * scaleFactor;
+          positions[i+1] = (floatData[i+1] - centerY) * scaleFactor;
+          positions[i+2] = (floatData[i+2] - centerZ) * scaleFactor;
+
+          // CEREBRO APAGADO / DORMANT POR DEFECTO:
+          // Toda la red permanece en reposo oscuro y profundo (silueta anatómica sutil)
+          // Las zonas brillan únicamente al activarse los circuitos neuronales en combate
+          const yNorm = (maxY > minY) ? (floatData[i+1] - minY) / (maxY - minY) : 0.5;
+          baseColors[i]   = 0.003 + yNorm * 0.002;
+          baseColors[i+1] = 0.006 + yNorm * 0.003;
+          baseColors[i+2] = 0.012 + yNorm * 0.005;
+
+          dynamicColors[i]   = baseColors[i];
+          dynamicColors[i+1] = baseColors[i+1];
+          dynamicColors[i+2] = baseColors[i+2];
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(dynamicColors, 3));
+
+        const material = new THREE.PointsMaterial({
+          size: is400k ? 1.15 : (is197k ? 1.4 : 1.8),
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending
+        });
+
+        pointCloud = new THREE.Points(geometry, material);
+        flyGroup.add(pointCloud);
+      });
+
+    // Sistema Dinámico de Iluminación de Circuitos Neuronales en Tiempo Real (Bio-Luminiscencia Activa)
+    function igniteCircuit(type) {
+      if (!pointCloud || !dynamicColors) return;
+
+      const is400k = numNeurons > 300000;
+      let start = 0, end = 0, r = 1, g = 1, b = 1, badgeId = '';
+
+      if (type === 'jump') {
+        // Red Giant Fiber / DNp01 (Salto y escape salvavidas): Verde Neón Esmeralda Radiante
+        start = is400k ? 246965 : 98786;
+        end   = is400k ? 296357 : 110000;
+        r = 0.2; g = 2.4; b = 0.6;
+        badgeId = 'c-gf';
+      } else if (type === 'attack') {
+        // Red Motora Descendente / Smashes y Ataques: Ámbar Dorado Solar Intenso
+        start = is400k ? 296358 : 110001;
+        end   = is400k ? 345750 : 130000;
+        r = 2.4; g = 1.5; b = 0.1;
+        badgeId = 'c-attack';
+      } else if (type === 'special') {
+        // Red VNC Especial / Reflector Shine y Fox Illusion: Azul Diamante / Cian Eléctrico
+        start = is400k ? 197572 : 130001;
+        end   = is400k ? 246964 : 148178;
+        r = 0.1; g = 1.9; b = 2.4;
+        badgeId = 'c-special';
+      } else if (type === 'shield') {
+        // Red de Protección / Teching Terrestre: Violeta / Magenta
+        start = is400k ? 220000 : 135000;
+        end   = is400k ? 246964 : 148000;
+        r = 1.9; g = 0.2; b = 1.8;
+        badgeId = 'c-shield';
+      } else if (type === 'optic') {
+        // Lóbulos Ópticos / Fotorreceptores y Looming: Onda Óptica Cian Bioluminiscente
+        start = 0;
+        end   = is400k ? 98785 : 49392;
+        r = 0.2; g = 1.8; b = 2.4;
+        badgeId = 'c-optic';
+      } else if (type === 'pam') {
+        // Núcleo PAM Dopaminérgico (Recompensa de Combos y Triunfo): Pulso Dorado Solar
+        start = is400k ? 148179 : 49393;
+        end   = is400k ? 197571 : 74000;
+        r = 2.5; g = 2.0; b = 0.2;
+        badgeId = 'c-pam';
+      } else if (type === 'ppl1') {
+        // Núcleo PPL1 Octopaminérgico (Alerta Máxima de Supervivencia): Rojo Carmesí
+        start = is400k ? 98786 : 74001;
+        end   = is400k ? 148178 : 98785;
+        r = 2.4; g = 0.2; b = 0.2;
+        badgeId = 'c-ppl1';
+      } else if (type === 'combo') {
+        // Red Cerebelar de Combos, Tech-Chase y Timing: Fucsia / Neón Púrpura Destellante
+        start = is400k ? 345751 : 148179;
+        end   = is400k ? 395143 : 197571;
+        r = 2.4; g = 0.2; b = 2.2;
+        badgeId = 'c-combo';
+      }
+
+      activeFlashes.push({ start, end, r, g, b, life: 1.0 });
+
+      // Encender badge de circuito en el HUD
+      if (badgeId) {
+        const el = document.getElementById(badgeId);
+        if (el) {
+          const className = 'active-' + badgeId.replace('c-', '');
+          el.classList.add(className);
+          setTimeout(() => el.classList.remove(className), 250);
+        }
+      }
+    }
+
+    function onWindowResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w > 0 && h > 0) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+      resizeArenaCanvas();
+    }
+    window.addEventListener('resize', onWindowResize);
+
+    function resizeArenaCanvas() {
+      const cont = document.getElementById('arena-canvas-container');
+      if (cont && cont.clientWidth > 0 && cont.clientHeight > 0) {
+        const targetW = Math.max(400, cont.clientWidth);
+        const targetH = Math.max(300, Math.min(cont.clientHeight, 560));
+        if (arenaCanvas.width !== targetW || arenaCanvas.height !== targetH) {
+          arenaCanvas.width = targetW;
+          arenaCanvas.height = targetH;
+        }
+      }
+    }
+
+    // 3. Melee Battlefield Arena 2D Canvas
+    const arenaCanvas = document.getElementById('arena-canvas');
+    const ctx = arenaCanvas.getContext('2d');
+    
+    let lasers = [];
+    let shineHex = 0;
+    let particles = [];
+
+    let gameState = {
+      distance: 35.0,
+      threat: 0.35,
+      action_name: "🏃 DASH DANCE / SPACING",
+      p1: { x: -25, y: 0, percent: 0, stock: 4, facing: 1, is_shining: false, is_laser: false },
+      p2: { x: 25, y: 0, percent: 0, stock: 4, facing: -1 },
+      action: { jump: false, attack: false, special: false, shield: false, grab: false, stick_x: 0.5, stick_y: 0.5, c_stick_x: 0.5, c_stick_y: 0.5 }
+    };
+
+    function renderArena() {
+      requestAnimationFrame(renderArena);
+      if (paneArena && paneArena.style.display === 'none') return;
+      try {
+        if (!gameState || !gameState.p1 || !gameState.p2) return;
+        const w = arenaCanvas.width;
+        const h = arenaCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+      // Fondo Espacial Cósmico
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, '#020617');
+      grad.addColorStop(0.5, '#0b1329');
+      grad.addColorStop(1, '#020617');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Rejilla de fondo táctica
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+
+      // Geometría y Escenario Dinámico (Omni-Stage: Battlefield, FD, Yoshi's, etc.)
+      const centerX = w / 2;
+      const stageY = h * 0.68;
+      const scaleX = 3.6;
+      const scaleY = 3.0;
+
+      // Plataforma Principal Dinámica según el Escenario detectado
+      const currentEdge = (gameState && gameState.stage_edge) ? gameState.stage_edge : 68.4;
+      const stageHalfW = currentEdge * scaleX;
+      const stageLeft = centerX - stageHalfW;
+      const stageRight = centerX + stageHalfW;
+      const stageW = stageHalfW * 2;
+      const stageH = 14;
+
+      // Base de roca o estructura flotante del escenario
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(stageLeft, stageY);
+      ctx.lineTo(stageRight, stageY);
+      ctx.lineTo(centerX + 65, stageY + 95);
+      ctx.lineTo(centerX, stageY + 115);
+      ctx.lineTo(centerX - 65, stageY + 95);
+      ctx.closePath();
+      const rockGrad = ctx.createLinearGradient(0, stageY, 0, stageY + 115);
+      rockGrad.addColorStop(0, '#1e293b');
+      rockGrad.addColorStop(0.5, '#0f172a');
+      rockGrad.addColorStop(1, '#020617');
+      ctx.fillStyle = rockGrad;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      // Superficie de combate principal
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(stageLeft, stageY, stageW, stageH);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(stageLeft, stageY);
+      ctx.lineTo(stageRight, stageY);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Etiqueta del Escenario en la esquina superior del Canvas
+      const stageTitle = (gameState && gameState.stage_name) ? gameState.stage_name : "Battlefield";
+      ctx.save();
+      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`🏟️ Escenario Activo: ${stageTitle} (Límite Ledge: ±${currentEdge.toFixed(1)}u)`, 20, 26);
+      ctx.restore();
+
+      // Plataformas Flotantes (si no es Final Destination / Flat Stage)
+      const isFlatStage = stageTitle.toLowerCase().includes("destination") || stageTitle.toLowerCase().includes("final");
+      if (!isFlatStage) {
+        function drawSoftPlatform(platX, platY, platW, color, glow) {
+          const px = centerX + platX * scaleX - (platW * scaleX) / 2;
+          const py = stageY - platY * scaleY;
+          const pw = platW * scaleX;
+          ctx.save();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3;
+          ctx.shadowColor = glow;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + pw, py);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          ctx.fillRect(px, py, pw, 5);
+          ctx.restore();
+        }
+
+        // Plataformas laterales y superior
+        const platOffset = Math.min(28.5, currentEdge * 0.42);
+        drawSoftPlatform(-platOffset, 27.2, 22.0, '#38bdf8', '#0284c7');
+        drawSoftPlatform( platOffset, 27.2, 22.0, '#38bdf8', '#0284c7');
+        drawSoftPlatform(  0.0, 54.4, 38.0, '#facc15', '#ca8a04');
+      }
+
+      // Mapear coordenadas a píxeles
+      const p1ScreenX = centerX + gameState.p1.x * scaleX;
+      const p1ScreenY = stageY - gameState.p1.y * scaleY;
+
+      const p2ScreenX = centerX + gameState.p2.x * scaleX;
+      const p2ScreenY = stageY - gameState.p2.y * scaleY;
+
+      // Láseres de Fox
+      if (gameState.p1.is_laser && Math.random() < 0.35) {
+        lasers.push({
+          x: p1ScreenX + (gameState.p1.facing * 18),
+          y: p1ScreenY - 14,
+          vx: gameState.p1.facing * 18,
+          life: 40
+        });
+      }
+
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        const l = lasers[i];
+        l.x += l.vx;
+        l.life--;
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(l.x, l.y, 22, 3);
+        ctx.shadowBlur = 0;
+        
+        if (Math.abs(l.x - p2ScreenX) < 16 && Math.abs(l.y - (p2ScreenY - 14)) < 20) {
+          l.life = 0;
+          for (let k = 0; k < 6; k++) {
+            particles.push({ x: p2ScreenX, y: p2ScreenY - 10, vx: (Math.random()-0.5)*6, vy: -Math.random()*4, color: '#f87171', life: 15 });
+          }
+        }
+        if (l.life <= 0) lasers.splice(i, 1);
+      }
+
+      // Shine (Reflector Down-B)
+      if (gameState.p1.is_shining) {
+        shineHex += 0.2;
+        ctx.save();
+        ctx.translate(p1ScreenX, p1ScreenY - 16);
+        ctx.rotate(shineHex);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let side = 0; side < 6; side++) {
+          const angle = (side * Math.PI) / 3;
+          const r = 26;
+          const x = r * Math.cos(angle);
+          const y = r * Math.sin(angle);
+          if (side === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Dibujar P1 (LUIGI o FOX según gameState.p1.name)
+      const p1NameStr = (gameState.p1.name || "Luigi").toLowerCase();
+      const isLuigi = p1NameStr.includes("luigi");
+
+      if (isLuigi) {
+        // Luigi: Mono azul marino y camisa verde
+        ctx.fillStyle = '#1e3a8a';
+        ctx.fillRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
+        ctx.fillStyle = '#16a34a';
+        ctx.fillRect(p1ScreenX - 8, p1ScreenY - 40, 16, 14);
+        // Gorra verde emblemática de Luigi
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.arc(p1ScreenX, p1ScreenY - 38, 9, Math.PI, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillRect(p1ScreenX - (gameState.p1.facing > 0 ? 3 : 11), p1ScreenY - 40, 14, 4);
+      } else {
+        // Fox: Traje blanco/azul y cabeza de zorro
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
+        ctx.fillStyle = '#ea580c';
+        ctx.fillRect(p1ScreenX - 8, p1ScreenY - 40, 16, 14);
+        // Orejas de Fox
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(p1ScreenX - 8, p1ScreenY - 40);
+        ctx.lineTo(p1ScreenX - 12, p1ScreenY - 48);
+        ctx.lineTo(p1ScreenX - 4, p1ScreenY - 40);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(p1ScreenX + 4, p1ScreenY - 40);
+        ctx.lineTo(p1ScreenX + 12, p1ScreenY - 48);
+        ctx.lineTo(p1ScreenX + 8, p1ScreenY - 40);
+        ctx.fill();
+      }
+
+      // Dibujar P2 (RIVAL HUMANO o BOT)
+      ctx.fillStyle = '#f87171';
+      ctx.fillRect(p2ScreenX - 10, p2ScreenY - 32, 20, 32);
+      ctx.fillStyle = '#1e3a8a';
+      ctx.fillRect(p2ScreenX + (gameState.p2.facing > 0 ? -14 : 6), p2ScreenY - 30, 8, 26);
+
+      // Etiquetas de nombres
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isLuigi ? '#4ade80' : '#60a5fa';
+      ctx.fillText("🪰 " + (gameState.p1.name || "Luigi (Mosca)"), p1ScreenX, p1ScreenY - 50);
+      ctx.fillStyle = '#f87171';
+      ctx.fillText("👤 " + (gameState.p2.name || "Tú (Jugador)"), p2ScreenX, p2ScreenY - 46);
+
+      // Partículas de impacto
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life--;
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(pt.x, pt.y, 3, 3);
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+      } catch (err) {
+        console.error("Error en renderArena:", err);
+      }
+    }
+    renderArena();
+
+    // 4. Three.js Animation Loop & Live Biological Spiking Decays
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // CEREBRO ESTÁTICO Y NÍTIDO: Sin auto-giro mareante.
+      // El usuario puede rotar con el ratón cuando lo desee.
+
+      // Aleteo biológico biomimético (solo activo si el exoesqueleto está visible)
+      if (showExoskeleton && wingL && wingR) {
+        const t = Date.now() * 0.004;
+        wingL.rotation.z = -0.6 + Math.sin(t * 3.5) * 0.09;
+        wingR.rotation.z =  0.6 - Math.sin(t * 3.5) * 0.09;
+      }
+
+      // Decaimiento biológico de destellos en las neuronas encendidas
+      if (pointCloud && dynamicColors && baseColors && activeFlashes.length > 0) {
+        let stillActive = [];
+        for (let f = 0; f < activeFlashes.length; f++) {
+          const item = activeFlashes[f];
+          item.life -= 0.07;
+          const blend = Math.max(0.0, item.life);
+          const start = item.start * 3;
+          const end = Math.min(dynamicColors.length, item.end * 3);
+          const r = item.r, g = item.g, b = item.b;
+
+          for (let i = start; i < end; i += 3) {
+            dynamicColors[i]   = baseColors[i]   + (r - baseColors[i])   * blend;
+            dynamicColors[i+1] = baseColors[i+1] + (g - baseColors[i+1]) * blend;
+            dynamicColors[i+2] = baseColors[i+2] + (b - baseColors[i+2]) * blend;
+          }
+
+          if (item.life > 0) {
+            stillActive.push(item);
+          } else {
+            for (let i = start; i < end; i += 3) {
+              dynamicColors[i]   = baseColors[i];
+              dynamicColors[i+1] = baseColors[i+1];
+              dynamicColors[i+2] = baseColors[i+2];
+            }
+          }
+        }
+        activeFlashes = stillActive;
+        pointCloud.geometry.attributes.color.needsUpdate = true;
+      }
+
+      if (paneBrain && paneBrain.style.display !== 'none' && container.clientWidth > 0 && container.clientHeight > 0) {
+        renderer.render(scene, camera);
+      }
+    }
+    animate();
+
+    // =========================================================================
+    // CONTROLES MANUALES DE RATÓN Y TÁCTIL (ORBITA MANUAL Y ZOOM)
+    // =========================================================================
+    let isDragging = false;
+    let prevMousePos = { x: 0, y: 0 };
+
+    container.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      prevMousePos = { x: e.clientX, y: e.clientY };
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging || !flyGroup) return;
+      const deltaX = e.clientX - prevMousePos.x;
+      const deltaY = e.clientY - prevMousePos.y;
+      flyGroup.rotation.y += deltaX * 0.006;
+      flyGroup.rotation.x += deltaY * 0.006;
+      prevMousePos = { x: e.clientX, y: e.clientY };
+    });
+
+    // Zoom con rueda del ratón calibrado
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      camera.position.z = Math.max(120, Math.min(850, camera.position.z + e.deltaY * 0.45));
+    }, { passive: false });
+
+    // Soporte para pantallas táctiles y touchpads
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        prevMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    });
+
+    window.addEventListener('touchend', () => {
+      isDragging = false;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDragging || !flyGroup || e.touches.length !== 1) return;
+      const deltaX = e.touches[0].clientX - prevMousePos.x;
+      const deltaY = e.touches[0].clientY - prevMousePos.y;
+      flyGroup.rotation.y += deltaX * 0.006;
+      flyGroup.rotation.x += deltaY * 0.006;
+      prevMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    });
+
+    function resetBrainView() {
+      if (flyGroup) flyGroup.rotation.set(0.08, 0, 0);
+      camera.position.set(0, 10, 470);
+      camera.lookAt(0, 0, 0);
+    }
+
+    // 5. Telemetría SSE en Tiempo Real & Actualización del Mando
+    const evtSource = new EventSource('/api/events');
+    evtSource.onmessage = function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        gameState = data;
+        
+        // Estado En Vivo vs En Espera
+        const badge = document.getElementById('live-badge');
+        if (badge) {
+          if (data.is_live) {
+            badge.textContent = '🔴 DOLPHIN MELEE EN VIVO';
+            badge.style.background = '#ef4444';
+            badge.style.color = '#ffffff';
+          } else {
+            badge.textContent = '⚪ DEMO BIO-NEURAL ACTIVA';
+            badge.style.background = '#30363d';
+            badge.style.color = '#8b949e';
+          }
+        }
+
+        // Nombres dinámicos de P1, P2 y Escenario
+        if (data.p1 && data.p1.name) {
+          const p1Label = document.getElementById('p1-name-label');
+          if (p1Label) p1Label.textContent = data.p1.name.toUpperCase();
+          const gcLabel = document.getElementById('gc-p1-label');
+          if (gcLabel) {
+            const shortName = data.p1.name.replace(/\(.*\)/, '').trim().toUpperCase();
+            gcLabel.textContent = `MANDO ${shortName}:`;
+          }
+          const p1Badge = document.getElementById('p1-badge');
+          if (p1Badge) {
+            const isLuigi = data.p1.name.toLowerCase().includes('luigi');
+            p1Badge.textContent = isLuigi ? "🟢 Luigi SSS Tier" : "🦊 Fox SSS Tier";
+            p1Badge.style.background = isLuigi ? "rgba(34, 197, 94, 0.2)" : "rgba(249, 115, 22, 0.2)";
+            p1Badge.style.color = isLuigi ? "#4ade80" : "#fb923c";
+          }
+        }
+
+        if (data.p2 && data.p2.name) {
+          const p2Label = document.getElementById('p2-name-label');
+          if (p2Label) p2Label.textContent = data.p2.name.toUpperCase();
+        }
+
+        if (data.stage_name) {
+          const stageBadge = document.getElementById('stage-badge');
+          if (stageBadge) stageBadge.textContent = `🏟️ ${data.stage_name}`;
+        }
+
+        // Porcentajes y Vidas
+        const p1Pct = document.getElementById('p1-pct');
+        const p2Pct = document.getElementById('p2-pct');
+        if (p1Pct && data.p1) p1Pct.textContent = `${Math.round(data.p1.percent)}%`;
+        if (p2Pct && data.p2) p2Pct.textContent = `${Math.round(data.p2.percent)}%`;
+
+        if (data.p1 && data.p1.stock !== undefined) {
+          const p1s = document.getElementById('p1-stocks');
+          if (p1s) p1s.textContent = "⭐".repeat(Math.max(0, data.p1.stock));
+        }
+        if (data.p2 && data.p2.stock !== undefined) {
+          const p2s = document.getElementById('p2-stocks');
+          if (p2s) p2s.textContent = "⭐".repeat(Math.max(0, data.p2.stock));
+        }
+
+        // Banner de Técnica
+        const banner = document.getElementById('action-banner');
+        if (banner) banner.textContent = data.action_name || (data.action && data.action.name) || "EN GUARDIA";
+
+        // Métricas de Neuroquímica
+        const valDopa = document.getElementById('val-dopa');
+        const valOcto = document.getElementById('val-octo');
+        const valThreat = document.getElementById('val-threat');
+        const valCombo = document.getElementById('val-combo');
+
+        if (valDopa && data.dopamine !== undefined) {
+          const dPct = Math.round(data.dopamine * 100);
+          if (data.dopamine <= 0.05) {
+            valDopa.textContent = `${dPct}% 💀 (SHOCK)`;
+            valDopa.style.color = '#ef4444';
+          } else if (data.dopamine >= 0.70) {
+            valDopa.textContent = `${dPct}% 🔥 (DEPREDADOR)`;
+            valDopa.style.color = '#facc15';
+          } else {
+            valDopa.textContent = `${dPct}%`;
+            valDopa.style.color = '#58a6ff';
+          }
+        }
+
+        if (valOcto && data.octopamine !== undefined) valOcto.textContent = `${Math.round(data.octopamine * 100)}%`;
+        if (valThreat && data.threat !== undefined) valThreat.textContent = `${Math.round(data.threat * 100)}%`;
+
+        if (valCombo && data.combo_count !== undefined) {
+          const c = data.combo_count;
+          valCombo.textContent = c > 0 ? `${c}x ${c >= 3 ? '🔥 ULTRA' : (c >= 2 ? '⚡ COMBO' : '💥 HIT')}` : '0';
+          valCombo.style.color = c >= 3 ? '#ec4899' : (c >= 2 ? '#a855f7' : '#22c55e');
+        }
+
+        // Métricas de Memoria Persistente Aprendida
+        if (data.memory) {
+          const valMatches = document.getElementById('val-matches');
+          const valEdgeFear = document.getElementById('val-edge-fear');
+          const valComboMastery = document.getElementById('val-combo-mastery');
+          if (valMatches && data.memory.matches_played !== undefined) {
+            valMatches.textContent = `${data.memory.matches_played} (KOs: ${data.memory.total_kos || 0})`;
+          }
+          if (valEdgeFear && data.memory.edge_fear !== undefined) {
+            valEdgeFear.textContent = `${data.memory.edge_fear}x (Zona Segura)`;
+          }
+          if (valComboMastery && data.memory.combo_mastery !== undefined) {
+            valComboMastery.textContent = `${data.memory.combo_mastery}x`;
+          }
+        }
+
+        // =========================================================================
+        // ACTUALIZACIÓN DE TARJETA DE EJECUCIÓN EN TIEMPO REAL (3D BRAIN)
+        // =========================================================================
+        const execTitle = document.getElementById('exec-action-title');
+        const execSub = document.getElementById('exec-sub');
+        const execInputs = document.getElementById('exec-inputs-hud');
+        
+        const currentActionName = data.action_name || (data.action && data.action.name) || "EN GUARDIA";
+        if (execTitle) execTitle.textContent = currentActionName;
+        
+        if (data.action) {
+          const act = data.action;
+          let activeCircuits = [];
+          if (act.jump) activeCircuits.push("DNp01 (Salto)");
+          if (act.attack) activeCircuits.push("Motor Ataque (A/Smash)");
+          if (act.special) activeCircuits.push("Reflector/Láser (B)");
+          if (act.shield) activeCircuits.push("Escudo/Tech (L)");
+          if (act.grab) activeCircuits.push("Agarre (Z)");
+          if (data.combo_count > 1) activeCircuits.push(`Cerebelo Combo (${data.combo_count}x)`);
+          if (data.threat > 0.35) activeCircuits.push("Fotorreceptores Visuales");
+          if (data.dopamine > 0.55) activeCircuits.push("Dopamina PAM (Ataque)");
+          if (data.octopamine > 0.35) activeCircuits.push("Octopamina PPL1 (Defensa)");
+
+          if (execSub) {
+            const netLabel = data.num_neurons ? `${data.num_neurons.toLocaleString()} LIF` : "197,572 LIF";
+            execSub.textContent = activeCircuits.length > 0 ? "⚡ " + activeCircuits.join(" | ") : `🧠 Red Central en Espera (${netLabel})`;
+          }
+
+          if (execInputs) {
+            const btns = [];
+            if (act.attack) btns.push("A");
+            if (act.special) btns.push("B");
+            if (act.jump) btns.push("Y");
+            if (act.grab) btns.push("Z");
+            if (act.shield) btns.push("L");
+            const btnStr = btns.length > 0 ? btns.join("+") : "NINGUNO";
+            const sx = act.stick_x !== undefined ? Number(act.stick_x).toFixed(2) : "0.50";
+            const sy = act.stick_y !== undefined ? Number(act.stick_y).toFixed(2) : "0.50";
+            execInputs.innerHTML = `🎮 Stick: (${sx}, ${sy}) | Botones: <strong style="color:#facc15;">${btnStr}</strong>`;
+          }
+        }
+
+        // =========================================================================
+        // ACTUALIZACIÓN VISUAL DEL MANDO GAMECUBE EN VIVO
+        // =========================================================================
+        if (data.action) {
+          const act = data.action;
+
+          // Main Stick (offset analógico en tiempo real)
+          const mainStick = document.getElementById('main-stick');
+          if (mainStick && act.stick_x !== undefined && act.stick_y !== undefined) {
+            const offsetX = (act.stick_x - 0.5) * 22;
+            const offsetY = (0.5 - act.stick_y) * 22;
+            mainStick.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+          }
+
+          // C-Stick (Smash Attacks)
+          const cStick = document.getElementById('c-stick');
+          if (cStick && act.c_stick_x !== undefined && act.c_stick_y !== undefined) {
+            const cX = (act.c_stick_x - 0.5) * 16;
+            const cY = (0.5 - act.c_stick_y) * 16;
+            cStick.style.transform = `translate(${cX}px, ${cY}px)`;
+          }
+
+          // Botones (A, B, Y, Z, L)
+          const btnA = document.getElementById('btn-a');
+          const btnB = document.getElementById('btn-b');
+          const btnY = document.getElementById('btn-y');
+          const btnZ = document.getElementById('btn-z');
+          const btnL = document.getElementById('btn-l');
+
+          if (btnA) {
+            if (act.attack) btnA.classList.add('active');
+            else btnA.classList.remove('active');
+          }
+          if (btnB) {
+            if (act.special) btnB.classList.add('active');
+            else btnB.classList.remove('active');
+          }
+          if (btnY) {
+            if (act.jump) btnY.classList.add('active');
+            else btnY.classList.remove('active');
+          }
+          if (btnZ) {
+            if (act.grab) btnZ.classList.add('active');
+            else btnZ.classList.remove('active');
+          }
+          if (btnL) {
+            if (act.shield) btnL.classList.add('active');
+            else btnL.classList.remove('active');
+          }
+
+          // =========================================================================
+          // ENCENDIDO DINÁMICO DE NEURONAS EN EL CEREBRO 3D
+          // =========================================================================
+          if (act.jump) igniteCircuit('jump');
+          if (act.attack || act.c_stick_y !== 0.5 || act.c_stick_x !== 0.5) igniteCircuit('attack');
+          if (act.special) igniteCircuit('special');
+          if (act.shield) igniteCircuit('shield');
+          if (data.combo_count > 1) igniteCircuit('combo');
+          if (data.threat > 0.35) igniteCircuit('optic');
+          if (data.dopamine > 0.6) igniteCircuit('pam');
+          if (data.octopamine > 0.35) igniteCircuit('ppl1');
+        }
+
+      } catch (err) {
+        console.error("Error procesando telemetría SSE:", err);
+      }
+    };
+
+    // Slider de amenaza interactivo
+    const threatSlider = document.getElementById('threat-slider');
+    const sliderVal = document.getElementById('slider-val');
+    threatSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      sliderVal.textContent = `${val}u`;
+      fetch(`/api/set_distance?val=${val}`);
+    });
+
+    // Inicializar por defecto en Vista Única de Arena: Fox (Mosca) vs Jugador (Tú)
+    setView('arena');
+  </script>
+</body>
+</html>

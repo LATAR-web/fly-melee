@@ -1,0 +1,19 @@
+# Archivos de emulación y binarios pesados (>100MB no permitidos en GitHub)
+data/games/
+*.iso
+bin/
+dolphin/
+
+# Respaldos y temporales
+*.bak
+*.swp
+*.log
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
