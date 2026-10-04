@@ -4,64 +4,136 @@
   <meta charset="UTF-8">
   <title>🪰 Conectoma de la Mosca (400k) × Super Smash Bros Melee</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+    :root {
+      --neon-green: #00ff66;
+      --neon-green-glow: 0 0 6px rgba(0, 255, 102, 0.65), 0 0 14px rgba(0, 255, 102, 0.35);
+      --neon-green-dim: #00993c;
+      --neon-cyan: #00f0ff;
+      --neon-cyan-glow: 0 0 6px rgba(0, 240, 255, 0.65), 0 0 14px rgba(0, 240, 255, 0.35);
+      --neon-red: #ff003c;
+      --neon-red-glow: 0 0 6px rgba(255, 0, 60, 0.65), 0 0 14px rgba(255, 0, 60, 0.35);
+      --neon-amber: #ffb000;
+      --bg-dark: #020703;
+      --bg-panel: rgba(2, 14, 5, 0.94);
+      --border-cyber: 1px solid rgba(0, 255, 102, 0.45);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background: #06090e;
-      color: #e6edf3;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background: var(--bg-dark);
+      color: var(--neon-green);
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
       overflow: hidden;
       height: 100vh;
       display: flex;
       flex-direction: column;
+      text-shadow: 0 0 3px rgba(0, 255, 102, 0.35);
+      position: relative;
     }
-    
+
+    /* CRT Scanlines Overlay */
+    body::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.32) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      z-index: 9999;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    /* CRT Vignette Screen Shadow */
+    body::after {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: radial-gradient(circle at 50% 50%, transparent 62%, rgba(0, 15, 3, 0.7) 100%);
+      z-index: 9998;
+      pointer-events: none;
+    }
+
     /* Top Header Bar */
     header {
       height: 48px;
-      background: #0d1117;
-      border-bottom: 1px solid #30363d;
+      background: #030c05;
+      border-bottom: 2px solid var(--neon-green);
+      box-shadow: 0 2px 14px rgba(0, 255, 102, 0.25);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
       z-index: 100;
+      letter-spacing: 0.5px;
     }
     .header-title {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 14px;
+      gap: 12px;
+      font-size: 13px;
       font-weight: bold;
+      color: var(--neon-green);
+      text-transform: uppercase;
     }
     .badge {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-weight: normal;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 2px;
+      font-family: inherit;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
-    .badge-fox { background: #1f6feb; color: #fff; }
-    .badge-neurons { background: #238636; color: #fff; }
-    .badge-live { background: #da3633; color: #fff; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-    
+    .badge-fox {
+      background: rgba(0, 255, 102, 0.12);
+      color: var(--neon-green);
+      border: 1px solid var(--neon-green);
+      box-shadow: 0 0 8px rgba(0, 255, 102, 0.25);
+    }
+    .badge-neurons {
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--neon-cyan);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+    }
+    .badge-live {
+      background: rgba(255, 0, 60, 0.15);
+      color: var(--neon-red);
+      border: 1px solid var(--neon-red);
+      box-shadow: 0 0 10px rgba(255, 0, 60, 0.4);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
     .view-toggles {
       display: flex;
       gap: 8px;
     }
     .view-btn {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
+      background: rgba(0, 255, 102, 0.05);
+      border: 1px solid rgba(0, 255, 102, 0.35);
+      color: var(--neon-green);
       padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 12px;
+      border-radius: 2px;
+      font-size: 11px;
+      font-family: inherit;
       cursor: pointer;
-      transition: all 0.2s;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.15s ease-in-out;
     }
     .view-btn.active, .view-btn:hover {
-      background: #388bfd;
-      color: #fff;
-      border-color: #388bfd;
+      background: var(--neon-green);
+      color: #020703;
+      font-weight: bold;
+      box-shadow: 0 0 14px var(--neon-green);
+      text-shadow: none;
     }
 
     /* Main Container (Split Screen) */
@@ -71,14 +143,14 @@
       overflow: hidden;
       position: relative;
     }
-    
-    /* Left: 3D Fly Brain & Exoskeleton (Oculto por defecto, solo visible si se pulsa 'Ver Cerebro 3D') */
+
+    /* Left: 3D Fly Brain & Exoskeleton */
     #pane-brain {
       display: none;
       flex: 1;
       position: relative;
-      border-right: 1px solid #30363d;
-      background: radial-gradient(circle at center, #071022 0%, #020617 100%);
+      border-right: 2px solid var(--neon-green-dim);
+      background: radial-gradient(circle at center, #06180b 0%, #010402 100%);
       transition: all 0.3s ease;
     }
     #canvas-3d {
@@ -86,28 +158,29 @@
       height: 100%;
       display: block;
     }
-    
+
     /* Right: Melee Battlefield Arena */
     #pane-arena {
       flex: 1;
       position: relative;
-      background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+      background: radial-gradient(circle at center, #051408 0%, #010402 100%);
       display: flex;
       flex-direction: column;
       transition: all 0.3s ease;
     }
-    
+
     /* HUD Overlays for 3D View */
     .brain-hud {
       position: absolute;
       top: 14px;
       left: 14px;
-      background: rgba(13, 17, 23, 0.88);
-      border: 1px solid rgba(48, 54, 61, 0.8);
-      border-radius: 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
+      box-shadow: 0 0 16px rgba(0, 255, 102, 0.2);
       backdrop-filter: blur(8px);
       padding: 10px 14px;
-      width: 250px;
+      width: 270px;
       font-size: 11px;
       pointer-events: none;
       z-index: 10;
@@ -116,18 +189,23 @@
       display: flex;
       justify-content: space-between;
       margin: 3px 0;
-      color: #8b949e;
+      color: #559966;
     }
-    .brain-metric span.val { color: #58a6ff; font-weight: bold; }
+    .brain-metric span.val {
+      color: var(--neon-green);
+      font-weight: bold;
+      text-shadow: 0 0 5px rgba(0, 255, 102, 0.7);
+    }
 
     /* Neural Circuits Activity Monitor */
     .circuit-hud {
       position: absolute;
       bottom: 14px;
       left: 14px;
-      background: rgba(13, 17, 23, 0.9);
-      border: 1px solid rgba(48, 54, 61, 0.8);
-      border-radius: 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
+      box-shadow: 0 0 16px rgba(0, 255, 102, 0.2);
       backdrop-filter: blur(8px);
       padding: 10px 14px;
       display: flex;
@@ -139,105 +217,131 @@
     }
     .circuit-hud-title {
       font-weight: bold;
-      color: #94a3b8;
-      font-size: 11px;
+      color: var(--neon-green);
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       margin-bottom: 2px;
+      border-bottom: 1px dashed rgba(0, 255, 102, 0.3);
+      padding-bottom: 3px;
     }
     .circuit-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      color: #64748b;
+      color: #337744;
       transition: all 0.15s ease-out;
     }
     .circuit-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #334155;
+      width: 7px;
+      height: 7px;
+      border-radius: 1px;
+      background: #0f3018;
+      border: 1px solid rgba(0, 255, 102, 0.3);
       transition: all 0.15s ease-out;
     }
-    .circuit-item.active-optic { color: #38bdf8; font-weight: bold; }
-    .circuit-item.active-optic .circuit-dot { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
-    .circuit-item.active-gf { color: #22c55e; font-weight: bold; }
-    .circuit-item.active-gf .circuit-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-    .circuit-item.active-attack { color: #f59e0b; font-weight: bold; }
-    .circuit-item.active-attack .circuit-dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-    .circuit-item.active-special { color: #6366f1; font-weight: bold; }
-    .circuit-item.active-special .circuit-dot { background: #6366f1; box-shadow: 0 0 8px #6366f1; }
+    .circuit-item.active-optic { color: var(--neon-cyan); font-weight: bold; }
+    .circuit-item.active-optic .circuit-dot { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
+    .circuit-item.active-gf { color: var(--neon-green); font-weight: bold; }
+    .circuit-item.active-gf .circuit-dot { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+    .circuit-item.active-attack { color: var(--neon-amber); font-weight: bold; }
+    .circuit-item.active-attack .circuit-dot { background: var(--neon-amber); box-shadow: 0 0 8px var(--neon-amber); }
+    .circuit-item.active-special { color: #a855f7; font-weight: bold; }
+    .circuit-item.active-special .circuit-dot { background: #a855f7; box-shadow: 0 0 8px #a855f7; }
     .circuit-item.active-shield { color: #ec4899; font-weight: bold; }
     .circuit-item.active-shield .circuit-dot { background: #ec4899; box-shadow: 0 0 8px #ec4899; }
-    .circuit-item.active-combo { color: #a855f7; font-weight: bold; }
-    .circuit-item.active-combo .circuit-dot { background: #a855f7; box-shadow: 0 0 10px #a855f7; }
+    .circuit-item.active-combo { color: #c084fc; font-weight: bold; }
+    .circuit-item.active-combo .circuit-dot { background: #c084fc; box-shadow: 0 0 10px #c084fc; }
     .circuit-item.active-pam { color: #facc15; font-weight: bold; }
     .circuit-item.active-pam .circuit-dot { background: #facc15; box-shadow: 0 0 8px #facc15; }
-    .circuit-item.active-ppl1 { color: #ef4444; font-weight: bold; }
-    .circuit-item.active-ppl1 .circuit-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .circuit-item.active-ppl1 { color: var(--neon-red); font-weight: bold; }
+    .circuit-item.active-ppl1 .circuit-dot { background: var(--neon-red); box-shadow: 0 0 8px var(--neon-red); }
 
     /* Scoreboard in Melee Arena */
     .arena-scoreboard {
-      height: 60px;
-      background: rgba(13, 17, 23, 0.95);
-      border-bottom: 1px solid #30363d;
+      height: 64px;
+      background: rgba(2, 10, 4, 0.95);
+      border-bottom: 1px solid rgba(0, 255, 102, 0.4);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 20px;
+      box-shadow: inset 0 -4px 10px rgba(0, 255, 102, 0.05);
     }
     .player-card {
       display: flex;
       align-items: center;
       gap: 12px;
+      background: rgba(0, 20, 6, 0.6);
+      border: 1px solid rgba(0, 255, 102, 0.3);
+      padding: 4px 12px;
+      border-radius: 2px;
     }
     .p1-icon, .p2-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: #1f6feb;
+      width: 36px;
+      height: 36px;
+      border-radius: 2px;
+      background: rgba(0, 255, 102, 0.15);
+      border: 1px solid var(--neon-green);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 0 10px rgba(31, 111, 235, 0.4);
+      font-size: 18px;
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
     }
     .p2-icon {
-      background: #da3633;
-      box-shadow: 0 0 10px rgba(218, 54, 51, 0.4);
+      background: rgba(255, 0, 60, 0.15);
+      border-color: var(--neon-red);
+      box-shadow: 0 0 10px rgba(255, 0, 60, 0.4);
     }
     .player-name {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: bold;
+      letter-spacing: 1px;
     }
-    .p1-name { color: #58a6ff; }
-    .p2-name { color: #f85149; }
+    .p1-name {
+      color: var(--neon-green);
+      text-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+    }
+    .p2-name {
+      color: var(--neon-red);
+      text-shadow: 0 0 8px rgba(255, 0, 60, 0.6);
+    }
     .player-percent {
-      font-size: 22px;
+      font-size: 26px;
+      font-family: 'VT323', 'Share Tech Mono', monospace;
       font-weight: 900;
-      font-family: monospace;
       line-height: 1;
+      letter-spacing: 2px;
+      color: var(--neon-green);
+      text-shadow: 0 0 8px var(--neon-green), 0 0 16px rgba(0, 255, 102, 0.5);
+    }
+    #p2-pct {
+      color: var(--neon-red);
+      text-shadow: 0 0 8px var(--neon-red), 0 0 16px rgba(255, 0, 60, 0.5);
     }
     .player-stocks {
-      font-size: 12px;
-      color: #facc15;
+      font-size: 11px;
+      color: var(--neon-amber);
+      letter-spacing: 2px;
     }
-    
+
     #action-banner {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      padding: 6px 16px;
-      border-radius: 20px;
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid #3b82f6;
-      color: #60a5fa;
-      box-shadow: 0 0 14px rgba(59, 130, 246, 0.3);
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 6px 18px;
+      border-radius: 2px;
+      background: rgba(0, 20, 6, 0.9);
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      box-shadow: 0 0 14px rgba(0, 255, 102, 0.35);
       text-align: center;
-      max-width: 280px;
+      max-width: 320px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-transform: uppercase;
     }
 
     /* Arena Viewport */
@@ -248,22 +352,24 @@
       align-items: center;
       justify-content: center;
       padding: 10px;
+      background: radial-gradient(circle at center, #041006 0%, #010402 100%);
     }
     #arena-canvas {
       width: 100%;
       height: 100%;
       max-height: 440px;
-      background: #030712;
-      border: 1px solid #1f2937;
-      border-radius: 8px;
+      background: #010602;
+      border: 1px solid var(--neon-green-dim);
+      box-shadow: 0 0 20px rgba(0, 255, 102, 0.15), inset 0 0 25px rgba(0, 255, 102, 0.08);
+      border-radius: 4px;
       display: block;
     }
-    
+
     /* Bottom Controls & Controller HUD */
     .arena-bottom {
-      background: #0d1117;
-      border-top: 1px solid #30363d;
-      padding: 10px 16px;
+      background: #030a04;
+      border-top: 1px solid var(--neon-green-dim);
+      padding: 8px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -273,41 +379,44 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 12px;
-      color: #8b949e;
+      font-size: 11px;
+      color: var(--neon-green-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
-    .interactive-slider input {
-      width: 130px;
+    .interactive-slider input[type="range"] {
+      accent-color: var(--neon-green);
       cursor: pointer;
+      width: 130px;
     }
-    
+
     /* Authentic GameCube Controller Visualization */
     .gc-controller-container {
       display: flex;
       align-items: center;
-      gap: 14px;
-      background: #111827;
+      gap: 12px;
+      background: rgba(0, 16, 4, 0.85);
       padding: 6px 14px;
-      border-radius: 10px;
-      border: 1px solid #374151;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      border-radius: 4px;
+      border: 1px solid var(--neon-green-dim);
+      box-shadow: 0 0 12px rgba(0, 255, 102, 0.15);
     }
     .gc-label {
       font-size: 10px;
-      font-weight: 800;
-      color: #9ca3af;
-      letter-spacing: 0.5px;
+      font-weight: bold;
+      color: var(--neon-green);
+      letter-spacing: 1px;
     }
-    
-    /* Stick Gate (Octagonal Bezel) */
+
+    /* Stick Gate (Radar / Reticle Bezel) */
     .stick-gate {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: #1f2937;
-      border: 2px solid #4b5563;
+      width: 42px;
+      height: 42px;
+      border-radius: 4px;
+      background: rgba(0, 255, 102, 0.04);
+      border: 1px solid var(--neon-green);
       position: relative;
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+      box-shadow: inset 0 0 8px rgba(0, 255, 102, 0.15);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -317,35 +426,35 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
-      opacity: 0.25;
+      opacity: 0.35;
     }
     .stick-cross::before {
-      content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: #9ca3af;
+      content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: var(--neon-green);
     }
     .stick-cross::after {
-      content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: #9ca3af;
+      content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: var(--neon-green);
     }
     .main-stick-knob {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #94a3b8 0%, #475569 100%);
-      border: 1px solid #cbd5e1;
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--neon-green);
+      border: 1px solid #fff;
       position: absolute;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      box-shadow: 0 0 8px var(--neon-green);
       transition: transform 0.04s ease-out;
     }
     .c-stick-knob {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #fde047 0%, #ca8a04 100%);
-      border: 1px solid #fef08a;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--neon-amber);
+      border: 1px solid #fff;
       position: absolute;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      box-shadow: 0 0 8px var(--neon-amber);
       transition: transform 0.04s ease-out;
     }
-    
+
     /* GameCube Buttons Cluster */
     .gc-buttons {
       display: flex;
@@ -353,99 +462,95 @@
       gap: 6px;
     }
     .btn-a {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: #15803d;
-      color: #dcfce7;
-      font-weight: 900;
-      font-size: 12px;
+      width: 24px;
+      height: 24px;
+      border-radius: 2px;
+      background: rgba(0, 255, 102, 0.1);
+      color: var(--neon-green);
+      font-weight: bold;
+      font-size: 11px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #16a34a;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      transition: all 0.1s ease;
+      border: 1px solid var(--neon-green);
+      transition: all 0.08s ease;
     }
     .btn-a.active {
-      background: #22c55e;
-      color: #ffffff;
-      box-shadow: 0 0 12px #22c55e;
-      transform: scale(0.92);
+      background: var(--neon-green);
+      color: #000;
+      box-shadow: 0 0 14px var(--neon-green);
     }
     .btn-b {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #b91c1c;
-      color: #fee2e2;
-      font-weight: 900;
+      width: 20px;
+      height: 20px;
+      border-radius: 2px;
+      background: rgba(255, 0, 60, 0.1);
+      color: var(--neon-red);
+      font-weight: bold;
       font-size: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #dc2626;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      transition: all 0.1s ease;
+      border: 1px solid var(--neon-red);
+      transition: all 0.08s ease;
     }
     .btn-b.active {
-      background: #ef4444;
-      color: #ffffff;
-      box-shadow: 0 0 12px #ef4444;
-      transform: scale(0.92);
+      background: var(--neon-red);
+      color: #fff;
+      box-shadow: 0 0 14px var(--neon-red);
     }
     .btn-xy {
-      width: 14px;
+      width: 16px;
       height: 22px;
-      border-radius: 8px;
-      background: #475569;
-      color: #f1f5f9;
-      font-weight: 800;
+      border-radius: 2px;
+      background: rgba(0, 240, 255, 0.1);
+      color: var(--neon-cyan);
+      font-weight: bold;
       font-size: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #64748b;
-      transition: all 0.1s ease;
+      border: 1px solid var(--neon-cyan);
+      transition: all 0.08s ease;
     }
     .btn-xy.active {
-      background: #a855f7;
-      color: #ffffff;
-      box-shadow: 0 0 10px #a855f7;
-      transform: scale(0.92);
+      background: var(--neon-cyan);
+      color: #000;
+      box-shadow: 0 0 12px var(--neon-cyan);
     }
     .btn-z {
-      width: 22px;
+      width: 20px;
       height: 14px;
-      border-radius: 6px;
-      background: #4338ca;
-      color: #e0e7ff;
-      font-weight: 800;
+      border-radius: 2px;
+      background: rgba(168, 85, 247, 0.1);
+      color: #c084fc;
+      font-weight: bold;
       font-size: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #6366f1;
-      transition: all 0.1s ease;
+      border: 1px solid #c084fc;
+      transition: all 0.08s ease;
     }
     .btn-z.active {
-      background: #818cf8;
-      box-shadow: 0 0 10px #818cf8;
+      background: #c084fc;
+      color: #000;
+      box-shadow: 0 0 12px #c084fc;
     }
     .btn-trigger {
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #334155;
-      color: #94a3b8;
-      font-weight: 800;
+      padding: 3px 6px;
+      border-radius: 2px;
+      background: rgba(255, 176, 0, 0.1);
+      color: var(--neon-amber);
+      font-weight: bold;
       font-size: 9px;
-      border: 1px solid #475569;
-      transition: all 0.1s ease;
+      border: 1px solid var(--neon-amber);
+      transition: all 0.08s ease;
     }
     .btn-trigger.active {
-      background: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 0 10px #38bdf8;
+      background: var(--neon-amber);
+      color: #000;
+      box-shadow: 0 0 12px var(--neon-amber);
     }
 
     /* Live Execution HUD Card on 3D Brain View */
@@ -453,49 +558,49 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      background: rgba(15, 23, 42, 0.90);
-      border: 1px solid rgba(56, 189, 248, 0.45);
-      border-radius: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
       padding: 12px 16px;
-      min-width: 250px;
-      max-width: 340px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65), 0 0 16px rgba(56, 189, 248, 0.25);
+      min-width: 260px;
+      max-width: 360px;
+      box-shadow: 0 0 20px rgba(0, 255, 102, 0.25);
       backdrop-filter: blur(8px);
       z-index: 10;
       pointer-events: none;
     }
     .exec-header {
       font-size: 10px;
-      font-weight: 800;
-      color: #38bdf8;
+      font-weight: bold;
+      color: var(--neon-green);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 1px;
       margin-bottom: 4px;
       display: flex;
       align-items: center;
       gap: 6px;
     }
     .exec-action-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #f8fafc;
-      letter-spacing: 0.02em;
-      text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 10px var(--neon-green);
       margin-bottom: 4px;
     }
     .exec-sub {
       font-size: 11px;
-      color: #94a3b8;
+      color: #44aa66;
       margin-bottom: 6px;
     }
     .exec-inputs {
       font-size: 11px;
-      font-family: monospace;
-      color: #a5f3fc;
-      background: rgba(8, 145, 178, 0.15);
+      font-family: inherit;
+      color: var(--neon-green);
+      background: rgba(0, 255, 102, 0.08);
       padding: 4px 8px;
-      border-radius: 6px;
-      border: 1px solid rgba(6, 182, 212, 0.3);
+      border-radius: 2px;
+      border: 1px solid var(--neon-green-dim);
     }
   </style>
 </head>
@@ -504,17 +609,18 @@
   <!-- Top Bar -->
   <header>
     <div class="header-title">
-      <span>🪰 Conectoma Mosca (400k) × Melee</span>
-      <span class="badge badge-fox" id="p1-badge">🟢 Luigi SSS Tier</span>
-      <span class="badge badge-neurons">395,144 Neuronas LIF (~73.0M Sinapsis)</span>
-      <span class="badge" id="stage-badge" style="background:#8b5cf6; color:#fff;">🏟️ Battlefield</span>
-      <span class="badge badge-live" id="live-badge">● ESPERANDO DOLPHIN...</span>
+      <span>[TERMINAL://FLYWIRE_400K] × MELEE_SYS</span>
+      <span class="badge badge-fox" id="p1-badge">[🟢 LUIGI_SSS]</span>
+      <span class="badge badge-neurons">[LIF: 395,144]</span>
+      <span class="badge" id="stage-badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid #c084fc;">[STAGE: BATTLEFIELD]</span>
+      <span class="badge badge-live" id="live-badge">[● AWAIT_DOLPHIN]</span>
     </div>
     <div class="view-toggles">
-      <button class="view-btn active" id="btn-arena" onclick="setView('arena')">⚔️ Arena Melee (Mosca vs Tú)</button>
-      <button class="view-btn" id="btn-brain" onclick="setView('brain')">🧠 Ver Cerebro 3D</button>
-      <button class="view-btn" id="btn-split" onclick="setView('split')">⚡ Vista Dual (Ambos)</button>
-      <button class="view-btn" id="btn-reset-cam" onclick="resetBrainView()" title="Centrar cámara" style="display:none;">🎯 Centrar</button>
+      <button class="view-btn active" id="btn-arena" onclick="setView('arena')">[ ⚔️ ARENA_FEED ]</button>
+      <button class="view-btn" id="btn-brain" onclick="setView('brain')">[ 🧠 CEREBELLUM_3D ]</button>
+      <button class="view-btn" id="btn-split" onclick="setView('split')">[ ⚡ DUAL_MONITOR ]</button>
+      <button class="view-btn" id="btn-toggle-exo" onclick="toggleExoskeleton()" title="Alternar exoesqueleto" style="display:none;">[ 🧠 CONECTOMA ]</button>
+      <button class="view-btn" id="btn-reset-cam" onclick="resetBrainView()" title="Centrar cámara" style="display:none;">[ 🎯 RECENTER ]</button>
     </div>
   </header>
 
@@ -525,43 +631,43 @@
     <div id="pane-brain">
       <canvas id="canvas-3d"></canvas>
 
-      <!-- Live Execution Card (Answers user's request: 'quiero ver el cerebro completo y que ejecuta') -->
+      <!-- Live Execution Card -->
       <div class="execution-card" id="execution-card">
-        <div class="exec-header">⚡ EJECUCIÓN EN TIEMPO REAL</div>
-        <div class="exec-action-title" id="exec-action-title">🦊 FOX EN GUARDIA</div>
-        <div class="exec-sub" id="exec-sub">Circuito: Conectoma 395,144 LIF</div>
-        <div class="exec-inputs" id="exec-inputs-hud">🎮 Stick: (0.50, 0.50) | Botones: <strong style="color:#facc15;">NINGUNO</strong></div>
+        <div class="exec-header">> [SYS_EXECUTION_FEED]</div>
+        <div class="exec-action-title" id="exec-action-title">> EN_GUARDIA</div>
+        <div class="exec-sub" id="exec-sub">// CIRCUITO: 395,144_LIF_CORE</div>
+        <div class="exec-inputs" id="exec-inputs-hud">[IN_STICK: (0.50, 0.50) | BTN: NINGUNO]</div>
       </div>
       
       <!-- Top Left Brain Metrics -->
       <div class="brain-hud">
-        <h4 style="color:#58a6ff; margin-bottom:5px;">🧠 Conectoma Drosophila Expandido</h4>
+        <h4 style="color:var(--neon-green); margin-bottom:5px; border-bottom:1px dashed var(--neon-green-dim); padding-bottom:3px;">// ROOT_NEURAL_MONITOR //</h4>
         <div class="brain-metric"><span>Neuronas biológicas:</span><span class="val">395,144</span></div>
-        <div class="brain-metric"><span>Sinapsis computadas:</span><span class="val">~73.0M</span></div>
+        <div class="brain-metric"><span>Sinapsis computadas:</span><span class="val">~73.0M CSC</span></div>
         <div class="brain-metric"><span>Frecuencia simulación:</span><span class="val" id="val-fps">60 FPS</span></div>
-        <div class="brain-metric"><span>Dopamina PAM (Ataque):</span><span class="val" id="val-dopa" style="color:#facc15;">50%</span></div>
-        <div class="brain-metric"><span>Octopamina PPL1 (Alerta):</span><span class="val" id="val-octo" style="color:#f87171;">20%</span></div>
-        <div class="brain-metric"><span>Racha de Combos:</span><span class="val" id="val-combo" style="color:#22c55e;">0</span></div>
+        <div class="brain-metric"><span>Dopamina PAM (Ataque):</span><span class="val" id="val-dopa" style="color:var(--neon-amber);">50%</span></div>
+        <div class="brain-metric"><span>Octopamina PPL1 (Alerta):</span><span class="val" id="val-octo" style="color:var(--neon-red);">20%</span></div>
+        <div class="brain-metric"><span>Racha de Combos:</span><span class="val" id="val-combo" style="color:var(--neon-green);">0</span></div>
         <div class="brain-metric"><span>Amenaza visual:</span><span class="val" id="val-threat">0%</span></div>
-        <div class="brain-metric" style="border-top:1px solid #30363d; margin-top:4px; padding-top:4px;">
-          <span>💾 Memoria Persistente:</span><span class="val" style="color:#38bdf8;">ACTIVA (DISCO)</span>
+        <div class="brain-metric" style="border-top:1px dashed var(--neon-green-dim); margin-top:4px; padding-top:4px;">
+          <span>[💾 MEM_LINK]:</span><span class="val" style="color:var(--neon-cyan);">PERSISTENT (DISK)</span>
         </div>
-        <div class="brain-metric"><span>Partidas Aprendidas:</span><span class="val" id="val-matches" style="color:#a855f7;">0</span></div>
-        <div class="brain-metric"><span>Aversión al Borde:</span><span class="val" id="val-edge-fear" style="color:#ef4444;">1.35x</span></div>
-        <div class="brain-metric"><span>Maestría de Combos:</span><span class="val" id="val-combo-mastery" style="color:#22c55e;">1.20x</span></div>
+        <div class="brain-metric"><span>Partidas Aprendidas:</span><span class="val" id="val-matches" style="color:#c084fc;">0</span></div>
+        <div class="brain-metric"><span>Aversión al Borde:</span><span class="val" id="val-edge-fear" style="color:var(--neon-red);">1.35x</span></div>
+        <div class="brain-metric"><span>Maestría de Combos:</span><span class="val" id="val-combo-mastery" style="color:var(--neon-green);">1.20x</span></div>
       </div>
 
       <!-- Bottom Left Live Circuits Lighting Monitor -->
       <div class="circuit-hud">
-        <div class="circuit-hud-title">⚡ Circuitos Neuronales Activos:</div>
-        <div class="circuit-item" id="c-optic"><div class="circuit-dot"></div><span>👁️ Fotorreceptores / Óptico (C0)</span></div>
-        <div class="circuit-item" id="c-pam"><div class="circuit-dot"></div><span>🧠 Dopamina PAM (Recompensa C1)</span></div>
-        <div class="circuit-item" id="c-ppl1"><div class="circuit-dot"></div><span>⚡ Octopamina PPL1 (Supervivencia C1)</span></div>
-        <div class="circuit-item" id="c-gf"><div class="circuit-dot"></div><span>🦘 Giant Fiber (DNp01 / Salto C2)</span></div>
-        <div class="circuit-item" id="c-attack"><div class="circuit-dot"></div><span>⚔️ Motor Ataque (A / Up-Smash C2)</span></div>
-        <div class="circuit-item" id="c-special"><div class="circuit-dot"></div><span>⚡ Motor Especial (B / Shine C2)</span></div>
-        <div class="circuit-item" id="c-shield"><div class="circuit-dot"></div><span>🛡️ Protección / Teching (L C2)</span></div>
-        <div class="circuit-item" id="c-combo"><div class="circuit-dot"></div><span>💥 Cerebelo de Combos / Techs (C3)</span></div>
+        <div class="circuit-hud-title">[!] BIO_CIRCUITS_ACTIVE:</div>
+        <div class="circuit-item" id="c-optic"><div class="circuit-dot"></div><span>[0x01] Fotorreceptores / Óptico (C0)</span></div>
+        <div class="circuit-item" id="c-pam"><div class="circuit-dot"></div><span>[0x02] Dopamina PAM (Recompensa C1)</span></div>
+        <div class="circuit-item" id="c-ppl1"><div class="circuit-dot"></div><span>[0x03] Octopamina PPL1 (Alerta C1)</span></div>
+        <div class="circuit-item" id="c-gf"><div class="circuit-dot"></div><span>[0x04] Giant Fiber (DNp01 / Salto C2)</span></div>
+        <div class="circuit-item" id="c-attack"><div class="circuit-dot"></div><span>[0x05] Motor Ataque (A / Smash C2)</span></div>
+        <div class="circuit-item" id="c-special"><div class="circuit-dot"></div><span>[0x06] Motor Especial (B / Shine C2)</span></div>
+        <div class="circuit-item" id="c-shield"><div class="circuit-dot"></div><span>[0x07] Protección / Teching (L C2)</span></div>
+        <div class="circuit-item" id="c-combo"><div class="circuit-dot"></div><span>[0x08] Cerebelo de Combos (C3)</span></div>
       </div>
     </div>
 
@@ -572,19 +678,19 @@
         <div class="player-card">
           <div class="p1-icon" id="p1-icon">🪰</div>
           <div>
-            <div class="player-name p1-name" id="p1-name-label">LUIGI (La Mosca 400k)</div>
-            <div class="player-percent" id="p1-pct" style="color:#f8fafc;">0%</div>
+            <div class="player-name p1-name" id="p1-name-label">[P1] LUIGI (400k)</div>
+            <div class="player-percent" id="p1-pct">0%</div>
             <div class="player-stocks" id="p1-stocks">⭐⭐⭐⭐</div>
           </div>
         </div>
 
-        <div id="action-banner">⚡ INICIALIZANDO MOSCA...</div>
+        <div id="action-banner">> [BOOT_SEQ: ONLINE]</div>
 
         <div class="player-card" style="flex-direction:row-reverse; text-align:right;">
           <div class="p2-icon">👤</div>
           <div>
-            <div class="player-name p2-name" id="p2-name-label">JUGADOR (Tú)</div>
-            <div class="player-percent" id="p2-pct" style="color:#f8fafc;">0%</div>
+            <div class="player-name p2-name" id="p2-name-label">[P2] TARGET (Tú)</div>
+            <div class="player-percent" id="p2-pct">0%</div>
             <div class="player-stocks" id="p2-stocks">⭐⭐⭐⭐</div>
           </div>
         </div>
@@ -598,14 +704,14 @@
       <!-- Bottom Status & GameCube Controller Widget -->
       <div class="arena-bottom">
         <div class="interactive-slider">
-          <span>Amenaza / Distancia:</span>
+          <span>[RADAR_RANGE]:</span>
           <input type="range" id="threat-slider" min="5" max="80" value="35">
-          <span id="slider-val" style="color:#58a6ff; font-weight:bold;">35u</span>
+          <span id="slider-val" style="color:var(--neon-green); font-weight:bold;">35u</span>
         </div>
 
         <!-- Authentic GameCube Controller Visualization -->
         <div class="gc-controller-container">
-          <span class="gc-label" id="gc-p1-label">MANDO MOSCA:</span>
+          <span class="gc-label" id="gc-p1-label">[GC_PAD_P1]:</span>
           
           <!-- L Trigger -->
           <div class="btn-trigger" id="btn-l">L</div>
@@ -650,6 +756,7 @@
     const btnArena = document.getElementById('btn-arena');
     const btnSplit = document.getElementById('btn-split');
     const btnResetCam = document.getElementById('btn-reset-cam');
+    const btnToggleExo = document.getElementById('btn-toggle-exo');
 
     function setView(mode) {
       if (btnBrain) btnBrain.classList.remove('active');
@@ -662,6 +769,7 @@
         paneBrain.style.flex = '1';
         if (btnBrain) btnBrain.classList.add('active');
         if (btnResetCam) btnResetCam.style.display = 'inline-block';
+        if (btnToggleExo) btnToggleExo.style.display = 'inline-block';
       } else if (mode === 'split') {
         paneBrain.style.display = 'block';
         paneArena.style.display = 'flex';
@@ -669,6 +777,7 @@
         paneArena.style.flex = '1';
         if (btnSplit) btnSplit.classList.add('active');
         if (btnResetCam) btnResetCam.style.display = 'inline-block';
+        if (btnToggleExo) btnToggleExo.style.display = 'inline-block';
       } else {
         // Vista única oficial: Fox (Mosca) vs Tú (Jugador Humano)
         paneBrain.style.display = 'none';
@@ -676,6 +785,7 @@
         paneArena.style.flex = '1';
         if (btnArena) btnArena.classList.add('active');
         if (btnResetCam) btnResetCam.style.display = 'none';
+        if (btnToggleExo) btnToggleExo.style.display = 'none';
       }
       setTimeout(onWindowResize, 60);
     }
@@ -845,7 +955,7 @@
       showExoskeleton = !showExoskeleton;
       flyExoGroup.visible = showExoskeleton;
       const btn = document.getElementById('btn-toggle-exo');
-      if (btn) btn.textContent = showExoskeleton ? "🪰 Con Exoesqueleto" : "🧠 Solo Conectoma";
+      if (btn) btn.textContent = showExoskeleton ? "[ 🪰 EXO: ON ]" : "[ 🧠 CONECTOMA ]";
     }
 
     // Cargar Conectoma de 197,572 Neuronas LIF (4 Clusters Anatómicos)
@@ -1052,19 +1162,18 @@
         const h = arenaCanvas.height;
         ctx.clearRect(0, 0, w, h);
 
-      // Fondo Espacial Cósmico
-      const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, '#020617');
-      grad.addColorStop(0.5, '#0b1329');
-      grad.addColorStop(1, '#020617');
-      ctx.fillStyle = grad;
+      // Fondo Terminal Retro Vectorial
+      ctx.fillStyle = '#010502';
       ctx.fillRect(0, 0, w, h);
 
-      // Rejilla de fondo táctica
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
+      // Rejilla de vector CRT phosphor green
+      ctx.strokeStyle = 'rgba(0, 255, 102, 0.08)';
       ctx.lineWidth = 1;
-      for (let x = 0; x < w; x += 40) {
+      for (let x = 0; x < w; x += 30) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 30) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
 
       // Geometría y Escenario Dinámico (Omni-Stage: Battlefield, FD, Yoshi's, etc.)
@@ -1081,7 +1190,7 @@
       const stageW = stageHalfW * 2;
       const stageH = 14;
 
-      // Base de roca o estructura flotante del escenario
+      // Base flotante del escenario (Wireframe Cyberpunk)
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(stageLeft, stageY);
@@ -1090,38 +1199,49 @@
       ctx.lineTo(centerX, stageY + 115);
       ctx.lineTo(centerX - 65, stageY + 95);
       ctx.closePath();
-      const rockGrad = ctx.createLinearGradient(0, stageY, 0, stageY + 115);
-      rockGrad.addColorStop(0, '#1e293b');
-      rockGrad.addColorStop(0.5, '#0f172a');
-      rockGrad.addColorStop(1, '#020617');
-      ctx.fillStyle = rockGrad;
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 10;
+      ctx.fillStyle = 'rgba(0, 30, 10, 0.5)';
       ctx.fill();
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = '#00ff66';
       ctx.lineWidth = 2;
+      ctx.shadowColor = '#00ff66';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      // Líneas wireframe interiores de perspectiva
+      ctx.beginPath();
+      ctx.moveTo(stageLeft, stageY);
+      ctx.lineTo(centerX, stageY + 115);
+      ctx.moveTo(stageRight, stageY);
+      ctx.lineTo(centerX, stageY + 115);
+      ctx.moveTo(stageLeft + stageHalfW * 0.5, stageY);
+      ctx.lineTo(centerX, stageY + 115);
+      ctx.moveTo(stageRight - stageHalfW * 0.5, stageY);
+      ctx.lineTo(centerX, stageY + 115);
+      ctx.strokeStyle = 'rgba(0, 255, 102, 0.2)';
+      ctx.lineWidth = 1;
       ctx.stroke();
       ctx.restore();
 
-      // Superficie de combate principal
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(stageLeft, stageY, stageW, stageH);
-      ctx.strokeStyle = '#38bdf8';
+      // Superficie principal del escenario (Vector Láser Verde)
+      ctx.save();
+      ctx.strokeStyle = '#00ff66';
       ctx.lineWidth = 3;
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 12;
+      ctx.shadowColor = '#00ff66';
+      ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.moveTo(stageLeft, stageY);
       ctx.lineTo(stageRight, stageY);
       ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.restore();
 
       // Etiqueta del Escenario en la esquina superior del Canvas
       const stageTitle = (gameState && gameState.stage_name) ? gameState.stage_name : "Battlefield";
       ctx.save();
-      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(`🏟️ Escenario Activo: ${stageTitle} (Límite Ledge: ±${currentEdge.toFixed(1)}u)`, 20, 26);
+      ctx.font = 'bold 12px "Share Tech Mono", monospace';
+      ctx.fillStyle = '#00ff66';
+      ctx.shadowColor = '#00ff66';
+      ctx.shadowBlur = 6;
+      ctx.fillText(`[STAGE_GEOM: ${stageTitle.toUpperCase()}] // LEDGE: ±${currentEdge.toFixed(1)}u`, 20, 26);
       ctx.restore();
 
       // Plataformas Flotantes (si no es Final Destination / Flat Stage)
@@ -1133,23 +1253,28 @@
           const pw = platW * scaleX;
           ctx.save();
           ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 2.5;
           ctx.shadowColor = glow;
           ctx.shadowBlur = 10;
           ctx.beginPath();
           ctx.moveTo(px, py);
           ctx.lineTo(px + pw, py);
           ctx.stroke();
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-          ctx.fillRect(px, py, pw, 5);
+          // Marcas tácticas vectoriales en los extremos
+          ctx.beginPath();
+          ctx.moveTo(px, py - 4); ctx.lineTo(px, py + 4);
+          ctx.moveTo(px + pw, py - 4); ctx.lineTo(px + pw, py + 4);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(0, 255, 102, 0.08)';
+          ctx.fillRect(px, py, pw, 4);
           ctx.restore();
         }
 
-        // Plataformas laterales y superior
+        // Plataformas laterales y superior estilo vector cyber
         const platOffset = Math.min(28.5, currentEdge * 0.42);
-        drawSoftPlatform(-platOffset, 27.2, 22.0, '#38bdf8', '#0284c7');
-        drawSoftPlatform( platOffset, 27.2, 22.0, '#38bdf8', '#0284c7');
-        drawSoftPlatform(  0.0, 54.4, 38.0, '#facc15', '#ca8a04');
+        drawSoftPlatform(-platOffset, 27.2, 22.0, '#00f0ff', '#00f0ff');
+        drawSoftPlatform( platOffset, 27.2, 22.0, '#00f0ff', '#00f0ff');
+        drawSoftPlatform(  0.0, 54.4, 38.0, '#00ff66', '#00ff66');
       }
 
       // Mapear coordenadas a píxeles
@@ -1159,7 +1284,7 @@
       const p2ScreenX = centerX + gameState.p2.x * scaleX;
       const p2ScreenY = stageY - gameState.p2.y * scaleY;
 
-      // Láseres de Fox
+      // Láseres / Proyectiles
       if (gameState.p1.is_laser && Math.random() < 0.35) {
         lasers.push({
           x: p1ScreenX + (gameState.p1.facing * 18),
@@ -1173,31 +1298,31 @@
         const l = lasers[i];
         l.x += l.vx;
         l.life--;
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#00ff66';
+        ctx.shadowColor = '#00ff66';
+        ctx.shadowBlur = 10;
         ctx.fillRect(l.x, l.y, 22, 3);
         ctx.shadowBlur = 0;
         
         if (Math.abs(l.x - p2ScreenX) < 16 && Math.abs(l.y - (p2ScreenY - 14)) < 20) {
           l.life = 0;
           for (let k = 0; k < 6; k++) {
-            particles.push({ x: p2ScreenX, y: p2ScreenY - 10, vx: (Math.random()-0.5)*6, vy: -Math.random()*4, color: '#f87171', life: 15 });
+            particles.push({ x: p2ScreenX, y: p2ScreenY - 10, vx: (Math.random()-0.5)*6, vy: -Math.random()*4, color: '#ff003c', life: 15 });
           }
         }
         if (l.life <= 0) lasers.splice(i, 1);
       }
 
-      // Shine (Reflector Down-B)
+      // Shine (Reflector Down-B / Up-B)
       if (gameState.p1.is_shining) {
         shineHex += 0.2;
         ctx.save();
         ctx.translate(p1ScreenX, p1ScreenY - 16);
         ctx.rotate(shineHex);
-        ctx.strokeStyle = '#38bdf8';
-        ctx.shadowColor = '#38bdf8';
+        ctx.strokeStyle = '#00f0ff';
+        ctx.shadowColor = '#00f0ff';
         ctx.shadowBlur = 16;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         for (let side = 0; side < 6; side++) {
           const angle = (side * Math.PI) / 3;
@@ -1209,60 +1334,84 @@
         }
         ctx.closePath();
         ctx.stroke();
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
         ctx.fill();
         ctx.restore();
       }
 
-      // Dibujar P1 (LUIGI o FOX según gameState.p1.name)
+      // Dibujar P1 (LUIGI o FOX estilo Hacker Vector)
       const p1NameStr = (gameState.p1.name || "Luigi").toLowerCase();
       const isLuigi = p1NameStr.includes("luigi");
 
+      ctx.save();
       if (isLuigi) {
-        // Luigi: Mono azul marino y camisa verde
-        ctx.fillStyle = '#1e3a8a';
+        // Luigi: Vector verde fosforescente con visor
+        ctx.fillStyle = 'rgba(0, 255, 102, 0.2)';
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00ff66';
+        ctx.shadowBlur = 10;
         ctx.fillRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
-        ctx.fillStyle = '#16a34a';
-        ctx.fillRect(p1ScreenX - 8, p1ScreenY - 40, 16, 14);
-        // Gorra verde emblemática de Luigi
-        ctx.fillStyle = '#22c55e';
+        ctx.strokeRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
+        // Cabeza / Gorra Vectorial
         ctx.beginPath();
-        ctx.arc(p1ScreenX, p1ScreenY - 38, 9, Math.PI, 2 * Math.PI);
+        ctx.arc(p1ScreenX, p1ScreenY - 38, 9, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.fillRect(p1ScreenX - (gameState.p1.facing > 0 ? 3 : 11), p1ScreenY - 40, 14, 4);
+        ctx.stroke();
+        // Visor de combate
+        ctx.fillStyle = '#00f0ff';
+        ctx.fillRect(p1ScreenX - (gameState.p1.facing > 0 ? 3 : 9), p1ScreenY - 40, 12, 3);
       } else {
-        // Fox: Traje blanco/azul y cabeza de zorro
-        ctx.fillStyle = '#3b82f6';
+        // Fox: Vector cian/naranja cibernético
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 10;
         ctx.fillRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
-        ctx.fillStyle = '#ea580c';
-        ctx.fillRect(p1ScreenX - 8, p1ScreenY - 40, 16, 14);
-        // Orejas de Fox
-        ctx.fillStyle = '#f97316';
+        ctx.strokeRect(p1ScreenX - 9, p1ScreenY - 28, 18, 28);
+        // Cabeza y orejas vectoriales
         ctx.beginPath();
-        ctx.moveTo(p1ScreenX - 8, p1ScreenY - 40);
+        ctx.moveTo(p1ScreenX - 8, p1ScreenY - 38);
         ctx.lineTo(p1ScreenX - 12, p1ScreenY - 48);
-        ctx.lineTo(p1ScreenX - 4, p1ScreenY - 40);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(p1ScreenX + 4, p1ScreenY - 40);
+        ctx.lineTo(p1ScreenX - 4, p1ScreenY - 38);
+        ctx.lineTo(p1ScreenX + 4, p1ScreenY - 38);
         ctx.lineTo(p1ScreenX + 12, p1ScreenY - 48);
-        ctx.lineTo(p1ScreenX + 8, p1ScreenY - 40);
+        ctx.lineTo(p1ScreenX + 8, p1ScreenY - 38);
+        ctx.closePath();
         ctx.fill();
+        ctx.stroke();
       }
+      ctx.restore();
 
-      // Dibujar P2 (RIVAL HUMANO o BOT)
-      ctx.fillStyle = '#f87171';
+      // Dibujar P2 (TARGET HUMANO / CPU estilo Wireframe Rojo)
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 0, 60, 0.2)';
+      ctx.strokeStyle = '#ff003c';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ff003c';
+      ctx.shadowBlur = 10;
       ctx.fillRect(p2ScreenX - 10, p2ScreenY - 32, 20, 32);
-      ctx.fillStyle = '#1e3a8a';
-      ctx.fillRect(p2ScreenX + (gameState.p2.facing > 0 ? -14 : 6), p2ScreenY - 30, 8, 26);
+      ctx.strokeRect(p2ScreenX - 10, p2ScreenY - 32, 20, 32);
+      // Retícula de mira enemiga
+      ctx.beginPath();
+      ctx.arc(p2ScreenX, p2ScreenY - 16, 7, 0, 2 * Math.PI);
+      ctx.moveTo(p2ScreenX - 11, p2ScreenY - 16); ctx.lineTo(p2ScreenX + 11, p2ScreenY - 16);
+      ctx.moveTo(p2ScreenX, p2ScreenY - 27); ctx.lineTo(p2ScreenX, p2ScreenY - 5);
+      ctx.stroke();
+      ctx.restore();
 
-      // Etiquetas de nombres
-      ctx.font = 'bold 12px Inter, sans-serif';
+      // Etiquetas de nombres estilo terminal hacker
+      ctx.font = 'bold 11px "Share Tech Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillStyle = isLuigi ? '#4ade80' : '#60a5fa';
-      ctx.fillText("🪰 " + (gameState.p1.name || "Luigi (Mosca)"), p1ScreenX, p1ScreenY - 50);
-      ctx.fillStyle = '#f87171';
-      ctx.fillText("👤 " + (gameState.p2.name || "Tú (Jugador)"), p2ScreenX, p2ScreenY - 46);
+      ctx.fillStyle = isLuigi ? '#00ff66' : '#00f0ff';
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 8;
+      ctx.fillText("[P1] " + (gameState.p1.name || "LUIGI"), p1ScreenX, p1ScreenY - 50);
+      ctx.fillStyle = '#ff003c';
+      ctx.shadowColor = '#ff003c';
+      ctx.fillText("[TARGET] " + (gameState.p2.name || "RIVAL"), p2ScreenX, p2ScreenY - 46);
+      ctx.shadowBlur = 0;
 
       // Partículas de impacto
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -1399,42 +1548,45 @@
         const badge = document.getElementById('live-badge');
         if (badge) {
           if (data.is_live) {
-            badge.textContent = '🔴 DOLPHIN MELEE EN VIVO';
-            badge.style.background = '#ef4444';
-            badge.style.color = '#ffffff';
+            badge.textContent = '[🔴 DOLPHIN: LIVE]';
+            badge.style.background = 'rgba(255, 0, 60, 0.2)';
+            badge.style.color = '#ff003c';
+            badge.style.borderColor = '#ff003c';
           } else {
-            badge.textContent = '⚪ DEMO BIO-NEURAL ACTIVA';
-            badge.style.background = '#30363d';
-            badge.style.color = '#8b949e';
+            badge.textContent = '[⚪ BIO_DEMO: ACTIVE]';
+            badge.style.background = 'rgba(0, 255, 102, 0.08)';
+            badge.style.color = '#00ff66';
+            badge.style.borderColor = 'rgba(0, 255, 102, 0.3)';
           }
         }
 
         // Nombres dinámicos de P1, P2 y Escenario
         if (data.p1 && data.p1.name) {
           const p1Label = document.getElementById('p1-name-label');
-          if (p1Label) p1Label.textContent = data.p1.name.toUpperCase();
+          if (p1Label) p1Label.textContent = `[P1] ${data.p1.name.toUpperCase()}`;
           const gcLabel = document.getElementById('gc-p1-label');
           if (gcLabel) {
             const shortName = data.p1.name.replace(/\(.*\)/, '').trim().toUpperCase();
-            gcLabel.textContent = `MANDO ${shortName}:`;
+            gcLabel.textContent = `[PAD_${shortName}]:`;
           }
           const p1Badge = document.getElementById('p1-badge');
           if (p1Badge) {
             const isLuigi = data.p1.name.toLowerCase().includes('luigi');
-            p1Badge.textContent = isLuigi ? "🟢 Luigi SSS Tier" : "🦊 Fox SSS Tier";
-            p1Badge.style.background = isLuigi ? "rgba(34, 197, 94, 0.2)" : "rgba(249, 115, 22, 0.2)";
-            p1Badge.style.color = isLuigi ? "#4ade80" : "#fb923c";
+            p1Badge.textContent = isLuigi ? "[🟢 LUIGI_SSS]" : "[🦊 FOX_SSS]";
+            p1Badge.style.background = isLuigi ? "rgba(0, 255, 102, 0.15)" : "rgba(255, 176, 0, 0.15)";
+            p1Badge.style.color = isLuigi ? "#00ff66" : "#ffb000";
+            p1Badge.style.borderColor = isLuigi ? "#00ff66" : "#ffb000";
           }
         }
 
         if (data.p2 && data.p2.name) {
           const p2Label = document.getElementById('p2-name-label');
-          if (p2Label) p2Label.textContent = data.p2.name.toUpperCase();
+          if (p2Label) p2Label.textContent = `[P2] ${data.p2.name.toUpperCase()}`;
         }
 
         if (data.stage_name) {
           const stageBadge = document.getElementById('stage-badge');
-          if (stageBadge) stageBadge.textContent = `🏟️ ${data.stage_name}`;
+          if (stageBadge) stageBadge.textContent = `[STAGE: ${data.stage_name.toUpperCase()}]`;
         }
 
         // Porcentajes y Vidas
@@ -1454,7 +1606,10 @@
 
         // Banner de Técnica
         const banner = document.getElementById('action-banner');
-        if (banner) banner.textContent = data.action_name || (data.action && data.action.name) || "EN GUARDIA";
+        if (banner) {
+          const actName = data.action_name || (data.action && data.action.name) || "EN_GUARDIA";
+          banner.textContent = `> ${actName}`;
+        }
 
         // Métricas de Neuroquímica
         const valDopa = document.getElementById('val-dopa');
@@ -1465,14 +1620,14 @@
         if (valDopa && data.dopamine !== undefined) {
           const dPct = Math.round(data.dopamine * 100);
           if (data.dopamine <= 0.05) {
-            valDopa.textContent = `${dPct}% 💀 (SHOCK)`;
-            valDopa.style.color = '#ef4444';
+            valDopa.textContent = `${dPct}% 💀 [SHOCK]`;
+            valDopa.style.color = '#ff003c';
           } else if (data.dopamine >= 0.70) {
-            valDopa.textContent = `${dPct}% 🔥 (DEPREDADOR)`;
-            valDopa.style.color = '#facc15';
+            valDopa.textContent = `${dPct}% 🔥 [PREDATOR]`;
+            valDopa.style.color = '#ffb000';
           } else {
             valDopa.textContent = `${dPct}%`;
-            valDopa.style.color = '#58a6ff';
+            valDopa.style.color = '#00f0ff';
           }
         }
 
@@ -1482,7 +1637,7 @@
         if (valCombo && data.combo_count !== undefined) {
           const c = data.combo_count;
           valCombo.textContent = c > 0 ? `${c}x ${c >= 3 ? '🔥 ULTRA' : (c >= 2 ? '⚡ COMBO' : '💥 HIT')}` : '0';
-          valCombo.style.color = c >= 3 ? '#ec4899' : (c >= 2 ? '#a855f7' : '#22c55e');
+          valCombo.style.color = c >= 3 ? '#ff003c' : (c >= 2 ? '#ffb000' : '#00ff66');
         }
 
         // Métricas de Memoria Persistente Aprendida
