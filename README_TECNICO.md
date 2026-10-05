@@ -382,3 +382,10 @@ La suite de validación continua en [`verify_fixes.py`](file:///home/ltar/projec
 🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (81/81 SUPERADAS)
 ======================================================================
 ```
+
+---
+
+## 📚 Enlaces Relacionados
+- [**DICCIONARIO_TECNICO.md**](file:///home/ltar/projects/fly-melee/DICCIONARIO_TECNICO.md): Glosario y enciclopedia de términos de neurociencia, tensores CSC, hardware y Melee 20XX de la A a la Z.
+- [**README.md**](file:///home/ltar/projects/fly-melee/README.md): Guía de instalación, inicio rápido y configuración del emulador Dolphin y panel web 3D.
+- [**verify_fixes.py**](file:///home/ltar/projects/fly-melee/verify_fixes.py): Suite de 81 pruebas de integración y verificación continua.

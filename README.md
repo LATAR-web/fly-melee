@@ -9,8 +9,9 @@ Simulación biofísica en tiempo real del cerebro completo de la mosca de la fru
 
 El conectoma biológico decodifica la percepción visual del combate, procesa la dinámica de neurotransmisores (**Dopamina PAM** y **Octopamina PPL1**), modula decisiones motoras mediante descargas de espigas en clusters anatómicos y ejecuta biomecánica avanzada a nivel competitivo 20XX con una barrera fail-safe de **cero suicidios**.
 
-> 📖 **¿Buscas la arquitectura matemática y biofísica completa?**  
-> Consulta el documento de ingeniería profunda: [**README_TECNICO.md**](file:///home/ltar/projects/fly-melee/README_TECNICO.md) (Ecuaciones LIF, tensores dispersos CSC, dinámica de los 8 clusters, transducción de looming y formalismo STDP).
+> 📖 **Documentación Técnica & Glosario de Conceptos:**  
+> - **[README_TECNICO.md](file:///home/ltar/projects/fly-melee/README_TECNICO.md)**: Whitepaper de arquitectura profunda (Ecuaciones LIF, tensores dispersos CSC, dinámica de los 8 clusters, justificación de librerías y transducción de looming).  
+> - **[DICCIONARIO_TECNICO.md](file:///home/ltar/projects/fly-melee/DICCIONARIO_TECNICO.md)**: Enciclopedia / Blog de conceptos de la A a la Z (Términos de neurobiología, matemáticas, hardware y jerga competitiva 20XX de Super Smash Bros. Melee).
 
 ---
 
