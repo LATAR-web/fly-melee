@@ -1505,8 +1505,54 @@ def run_tests():
     assert "MASH-OUT ESCAPE 20XX" in act_mashout["name"]
     print("✅ TEST 73 SUPERADO: La mosca ejecuta Mash-Out frame-perfect a 60 inputs/s para zafarse del agarre.")
 
+    # -------------------------------------------------------------
+    # TEST 74: Powershield Reflect y Zero Shield-Stun Shoryuken Counter
+    # -------------------------------------------------------------
+    print("\n--- Test 74: Powershield Reflect & Zero Shield-Stun Shoryuken Counter ---")
+    p_luigi_ps = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_ps.character = "LUIGI"
+    p_opp_blaster = MockPlayer(x=16.0, y=0.0, on_ground=True, action="SPECIAL_N", act_val=341, percent=60.0)
+    brain.powershield_state = None
+    
+    # Frame 1200: Detección de proyectil y activación Powershield Frame-1
+    act_ps_frame1 = brain.get_luigi_decision(player=p_luigi_ps, opponent=p_opp_blaster, current_frame=1200, stage="BATTLEFIELD")
+    print(f"Paso 1 (Powershield Frame-1): {act_ps_frame1['name']} | Shield={act_ps_frame1['shield']}")
+    assert act_ps_frame1["shield"] and "POWERSHIELD FRAME-1" in act_ps_frame1["name"]
+    assert brain.powershield_state == "POWERSHIELD_ACTIVE"
+    
+    # Frame 1201: Impacto reflejado con cero lag y castigo Sweetspot Shoryuken si el rival está a quemarropa
+    p_opp_blaster.position.x = 4.5
+    act_ps_frame2 = brain.get_luigi_decision(player=p_luigi_ps, opponent=p_opp_blaster, current_frame=1201, stage="BATTLEFIELD")
+    print(f"Paso 2 (Zero Shield-Stun Counter): {act_ps_frame2['name']} | Special={act_ps_frame2['special']}, Stick Y={act_ps_frame2['stick_y']}")
+    assert act_ps_frame2["special"] and act_ps_frame2["stick_y"] == 1.0 and "POWERSHIELD COUNTER" in act_ps_frame2["name"]
+    print("✅ TEST 74 SUPERADO: Luigi ejecuta Powershield Frame-1 y contraataca sin shield stun con Sweetspot Up-B.")
+
+    # -------------------------------------------------------------
+    # TEST 75: Shield Drop 20XX en Plataformas (Descenso Frame-1 ➔ Counter Aéreo)
+    # -------------------------------------------------------------
+    print("\n--- Test 75: Shield Drop 20XX en Plataformas ---")
+    p_luigi_plat_shield = MockPlayer(x=-35.0, y=27.2, on_ground=True, action="GUARD_ON", act_val=178)
+    p_luigi_plat_shield.character = "LUIGI"
+    p_opp_underneath = MockPlayer(x=-35.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    act_shielddrop = brain.get_luigi_decision(player=p_luigi_plat_shield, opponent=p_opp_underneath, current_frame=1210, stage="BATTLEFIELD")
+    print(f"Shield Drop Action: {act_shielddrop['name']} | Attack={act_shielddrop['attack']}, Stick Y={act_shielddrop['stick_y']}")
+    assert act_shielddrop["attack"] and act_shielddrop["stick_y"] == 0.28 and "SHIELD DROP 20XX" in act_shielddrop["name"]
+    print("✅ TEST 75 SUPERADO: Luigi domina el Shield Drop Frame-1 para descender de plataformas con ataque aéreo.")
+
+    # -------------------------------------------------------------
+    # TEST 76: Platform Edge-Cancel Slide (0 Frames Landing Lag)
+    # -------------------------------------------------------------
+    print("\n--- Test 76: Platform Edge-Cancel Slide ---")
+    p_luigi_edge_cancel = MockPlayer(x=-19.5, y=27.5, on_ground=False, action="ATTACK_AIR_N", act_val=65)
+    p_luigi_edge_cancel.character = "LUIGI"
+    p_luigi_edge_cancel.speed_air_x_self = 0.85
+    act_edge_cancel = brain.get_luigi_decision(player=p_luigi_edge_cancel, opponent=p_opp_underneath, current_frame=1220, stage="BATTLEFIELD")
+    print(f"Edge-Cancel Action: {act_edge_cancel['name']}")
+    assert "PLATFORM EDGE-CANCEL" in act_edge_cancel["name"]
+    print("✅ TEST 76 SUPERADO: Luigi desliza el aterrizaje fuera del borde de plataforma a 0 frames de lag.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (73/73 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (76/76 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

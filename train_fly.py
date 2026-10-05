@@ -177,6 +177,29 @@ def simulate_match(brain, fly_char="LUIGI", c_name="FOX", st_name="BATTLEFIELD",
         brain.learn_from_success("SAFE_RECOVERY", value=1.5)
 
     # -----------------------------------------------------------------
+    # FASE 2C: POWERSHIELD REFLECT & SHIELD DROP 20XX
+    # -----------------------------------------------------------------
+    # 1. Powershield Reflect de Proyectiles
+    p_opp_gun = MockPlayer(x=18.0, y=0.0, on_ground=True, action="SPECIAL_N", act_val=341, percent=50.0)
+    p_opp_gun.character = c_name
+    act_ps1 = brain.get_controller_decision(player=p_fly, opponent=p_opp_gun, current_frame=match_frame_base + 18, stage=st_name)
+    if act_ps1.get("shield") or "POWERSHIELD" in act_ps1["name"]:
+        act_ps2 = brain.get_controller_decision(player=p_fly, opponent=p_opp_gun, current_frame=match_frame_base + 19, stage=st_name)
+        if "POWERSHIELD" in act_ps2["name"] or act_ps2.get("special") or act_ps2.get("jump"):
+            brain.learn_from_success("POWERSHIELD", value=2.0)
+            match_combos += 1
+
+    # 2. Shield Drop en Plataforma flotante
+    p_fly_plat = MockPlayer(x=25.0, y=27.2, on_ground=True, action="GUARD_ON", act_val=178)
+    p_fly_plat.character = fly_char
+    p_opp_under = MockPlayer(x=25.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_opp_under.character = c_name
+    act_sd = brain.get_controller_decision(player=p_fly_plat, opponent=p_opp_under, current_frame=match_frame_base + 20, stage="BATTLEFIELD")
+    if "SHIELD DROP" in act_sd["name"] or act_sd.get("_allow_drop_through"):
+        brain.learn_from_success("SHIELD_DROP", value=2.0)
+        match_combos += 1
+
+    # -----------------------------------------------------------------
     # FASE 3: COMBO & CASTIGO ESPECÍFICO DE ARCHETYPE
     # -----------------------------------------------------------------
     start_pct = random.uniform(25.0, 70.0)
@@ -335,6 +358,8 @@ def print_status_summary(brain, fly_char="LUIGI"):
         ("shield_reaction", "Opciones Out of Shield (WD / Up-B OOS)"),
         ("tech_chase_reaction", "Lectura de Techs & Jab-Reset"),
         ("floaty_killer", "Caza Anti-Floaty (U-Air / D-Smash)"),
+        ("powershield_mastery", "Powershield Frame-1 (Reflejo 1.5x)"),
+        ("shield_drop_iq", "Shield Drop 20XX en Plataformas"),
         ("recovery_iq", "Recuperación Offstage y Wiggle-Out")
     ]
     for key, label in metrics:
@@ -535,6 +560,59 @@ def run_grab_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
     print(f"\n✅ Drill de Agarres & Lanzamientos completado en {dt:.2f} s.")
     print_status_summary(brain, fly_char=fly_char_upper)
 
+def run_powershield_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento de Powershield Frame-1 reflect y contraataques sin shield-stun."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "🛡️ ENTRENAMIENTO DE POWERSHIELD FRAME-1 & REFLEJO 20XX",
+        f"{num_reps} Repeticiones | Reflejo de Proyectiles a 1.5x Daño | Cero Shield-Stun Counter"
+    )
+
+    t0 = time.time()
+    targets = ["FALCO", "FOX", "SAMUS", "DOC", "PEACH"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="powershield", match_num=i)
+        ps_p = brain.get_plasticity("powershield_mastery", 1.70)
+        cqc_p = brain.get_plasticity("cqc_counter_reflex", 1.60)
+        action_name = "Powershield ➔ Sweetspot Shoryuken (Ping!)" if i % 2 == 0 else "Powershield ➔ Wavedash Reflect Rushdown"
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | {action_name:<44} | Powershield: {ps_p:.2f}x | CQC: {cqc_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Powershield completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_shielddrop_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento de Shield Drop en plataformas de Battlefield y Yoshi's Story."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "🛡️ ENTRENAMIENTO DE SHIELD DROP 20XX EN PLATAFORMAS",
+        f"{num_reps} Repeticiones | Descenso Frame-1 de Plataforma ➔ Counter Aéreo Inmediato"
+    )
+
+    t0 = time.time()
+    targets = ["MARTH", "SHEIK", "FALCON", "FOX", "BOWSER"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(["BATTLEFIELD", "YOSHIS_STORY", "FOUNTAIN_OF_DREAMS"])
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="shielddrop", match_num=i)
+        sd_p = brain.get_plasticity("shield_drop_iq", 1.65)
+        shark_p = brain.get_plasticity("platform_shark_iq", 1.55)
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | Shield Drop Frame-1 ➔ D-Air Drill / N-Air      | Shield Drop: {sd_p:.2f}x | Shark: {shark_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Shield Drop completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
 def run_full_training(num_matches=50, cpu_level=9, fly_character="luigi"):
     """Entrenamiento general multi-fase contra todo el roster de Melee."""
     fly_char_upper = fly_character.upper()
@@ -574,7 +652,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Entrenador Biológico Neural Acelerado para la Mosca (Drosophila 400k) 20XX")
     parser.add_argument("matches", type=int, nargs="?", default=50, help="Número de partidas a entrenar (por defecto: 50)")
     parser.add_argument("--matches", "-m", dest="matches_opt", type=int, default=None, help="Número de partidas")
-    parser.add_argument("--mode", choices=["full", "gauntlet", "spacies", "whiff", "edgeguard", "techchase", "grab", "throw", "throws"], default="full", help="Modo o drill de entrenamiento especializado")
+    parser.add_argument("--mode", choices=["full", "gauntlet", "spacies", "whiff", "edgeguard", "techchase", "grab", "throw", "throws", "powershield", "reflect", "shielddrop"], default="full", help="Modo o drill de entrenamiento especializado")
     parser.add_argument("--cpu", "-c", type=int, default=9, help="Nivel de dificultad del Bot CPU rival (1-9)")
     parser.add_argument("--character", "-k", default="luigi", choices=["luigi", "fox"], help="Personaje de la mosca (luigi o fox)")
     args = parser.parse_args()
@@ -594,5 +672,9 @@ if __name__ == "__main__":
         run_techchase_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
     elif args.mode in ["grab", "throw", "throws"]:
         run_grab_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode in ["powershield", "reflect"]:
+        run_powershield_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode == "shielddrop":
+        run_shielddrop_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
     else:
         run_full_training(num_matches=num, cpu_level=args.cpu, fly_character=args.character)

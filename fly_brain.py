@@ -201,7 +201,9 @@ class FlyBrain:
                 "cqc_counter_reflex": 1.60,
                 "whiff_punish_iq": 1.70,
                 "ledgedash_mastery": 1.70,
-                "tech_chase_reaction": 1.75
+                "tech_chase_reaction": 1.75,
+                "powershield_mastery": 1.70,
+                "shield_drop_iq": 1.65
             },
             "matchup_intelligence": {},
             "opponent_habits": {
@@ -403,6 +405,14 @@ class FlyBrain:
         elif success_type == "TECH_CHASE":
             p["tech_chase_reaction"] = min(max_p, p.get("tech_chase_reaction", 1.75) + 0.08 * value)
             p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.04 * value)
+
+        elif success_type == "POWERSHIELD":
+            p["powershield_mastery"] = min(max_p, p.get("powershield_mastery", 1.70) + 0.08 * value)
+            p["shield_reaction"] = min(max_p, p.get("shield_reaction", 1.40) + 0.06 * value)
+
+        elif success_type == "SHIELD_DROP":
+            p["shield_drop_iq"] = min(max_p, p.get("shield_drop_iq", 1.65) + 0.08 * value)
+            p["platform_shark_iq"] = min(max_p, p.get("platform_shark_iq", 1.55) + 0.06 * value)
 
         elif success_type == "DAMAGE_DEALT":
             p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.005 * value)
@@ -1234,11 +1244,14 @@ class FlyBrain:
         is_tumbling = (act_val == 38) or ("TUMBL" in act_str)
 
         if is_in_hitstun:
-            # Survival DI hacia el centro/arriba
+            sdi_cycle = current_frame % 2
+            sdi_x = float(dir_to_stage) if sdi_cycle == 0 else 0.5
+            sdi_y = 0.85 if sdi_cycle == 0 else 0.15
+            # Survival DI hacia el centro/arriba con SDI multi-frame cuántico 20XX
             return self._enforce_safety({
-                "name": "🛡️ SURVIVAL DI HACIA EL ESCENARIO",
+                "name": "🛡️ SURVIVAL DI + SDI CUÁNTICO HACIA EL ESCENARIO",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                "stick_x": float(sdi_x), "stick_y": float(sdi_y), "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
         # Fox capturado en agarre por el rival: Mash-out 20XX a 60 inputs/segundo
@@ -1581,10 +1594,26 @@ class FlyBrain:
         self.ledge_option_state = None
 
         # =========================================================================
-        # 3. L-CANCEL AUTOMÁTICO EN ATERRIZAJES DE ATAQUES AÉREOS & DRILL-SMASH
+        # 3. L-CANCEL AUTOMÁTICO EN ATERRIZAJES DE ATAQUES AÉREOS & PLATFORM EDGE-CANCEL
         # =========================================================================
         if any(aerial in act_str for aerial in ["NAIR", "DAIR", "UAIR", "BAIR", "FAIR"]) or (act_val in [65, 66, 67, 68, 69]):
-            is_near_landing = (0.0 <= py <= 8.5) or (22.0 <= py <= 32.0) or (48.0 <= py <= 60.0) or (BattlefieldMap.is_on_platform(px, py - 3.0) is not None)
+            is_on_plat_landing = BattlefieldMap.is_on_platform(px, py - 3.0, stage)
+            is_near_landing = (0.0 <= py <= 8.5) or (22.0 <= py <= 32.0) or (48.0 <= py <= 60.0) or (is_on_plat_landing is not None)
+            
+            # PLATFORM EDGE-CANCEL SLIDE: Deslizamiento fuera del borde de plataforma a 0 frames de lag
+            h_speed = max(abs(getattr(player, "speed_ground_x_self", 0.0)), abs(getattr(player, "speed_air_x_self", 0.0)))
+            is_near_plat_edge = False
+            if is_on_plat_landing and h_speed > 0.40:
+                if abs(abs(px) - 19.5) < 3.5 or abs(abs(px) - 58.0) < 3.5 or abs(abs(px) - 19.0) < 3.5:
+                    is_near_plat_edge = True
+
+            if is_near_plat_edge:
+                return self._enforce_safety({
+                    "name": "⚡ FOX PLATFORM EDGE-CANCEL: CANCELACIÓN A CERO FRAMES DE LAG",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
             if is_near_landing and getattr(player, "speed_y_self", 0) < -0.15:
                 if "DAIR" in act_str or act_val == 67 or getattr(self, "drill_smash_state", None) == "DRILL_ACTIVE":
                     self.drill_smash_state = "DRILL_LANDED"
@@ -1631,6 +1660,18 @@ class FlyBrain:
                     "name": "🛡️ ESCUDO: ROLL DE EMERGENCIA (ANTI-BREAK)",
                     "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+            # A2) SHIELD DROP 20XX: Si Fox está en escudo sobre una plataforma y el rival está abajo
+            fox_plat = BattlefieldMap.is_on_platform(px, py, stage)
+            if fox_plat and (oy < py - 3.5):
+                self.shield_frames = 0
+                self.learn_from_success("SHIELD_DROP")
+                return self._enforce_safety({
+                    "name": "🛡️ FOX SHIELD DROP 20XX: DESCENSO INSTANTÁNEO ➔ DRILL / SHINE",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.28, "c_stick_x": 0.5, "c_stick_y": 0.0,
+                    "_allow_drop_through": True, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             # B) Si el rival está a rango cuerpo a cuerpo (dist <= 12.0 u):
@@ -2039,7 +2080,37 @@ class FlyBrain:
                 }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
-        # 9. COMBATE CUERPO A CUERPO CQC (dist <= 11.0 unidades) (Requisito 8: NUNCA RELAJARSE)
+        # 9. POWERSHIELD REFLECT & ZERO SHIELD-STUN COUNTER (FRAME-1 REFLEJO DE PROYECTIL)
+        # =========================================================================
+        is_projectile = any(k in opp_act_str for k in ["LASER", "BLASTER", "MISSILE", "SPECIAL_N", "SPECIAL_S", "ITEM_THROW", "PILL", "TURNIP", "CHARGE_SHOT"]) or (opp_act_val in [341, 342, 343, 344, 345, 348, 349, 350])
+        is_ps_ready = (getattr(self, "powershield_state", None) == "POWERSHIELD_ACTIVE") and (current_frame - getattr(self, "powershield_frame", -100) <= 2)
+        if is_ps_ready and getattr(player, "on_ground", True):
+            self.powershield_state = None
+            self.learn_from_success("POWERSHIELD")
+            if dist <= 8.0:
+                return self._enforce_safety({
+                    "name": "💥 FOX POWERSHIELD COUNTER: RUNNING JC UP-SMASH",
+                    "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 1.0, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "⚡ FOX POWERSHIELD REFLECT: WAVEDASH ADELANTE",
+                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        if is_projectile and getattr(player, "on_ground", True):
+            self.powershield_state = "POWERSHIELD_ACTIVE"
+            self.powershield_frame = current_frame
+            return self._enforce_safety({
+                "name": "🛡️ POWERSHIELD FRAME-1: REFLEJO DE PROYECTIL (CERO SHIELD-STUN)",
+                "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
+        # =========================================================================
+        # 10. COMBATE CUERPO A CUERPO CQC (dist <= 11.0 unidades) (Requisito 8: NUNCA RELAJARSE)
         # =========================================================================
         is_opp_attacking = ("ATTACK" in opp_act_str or "SWORD" in opp_act_str or "SPECIAL" in opp_act_str or opp_act_val in range(44, 75))
         is_opp_shielding = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
@@ -2128,7 +2199,7 @@ class FlyBrain:
             }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
-        # 10. NEUTRAL TÁCTICO: DASH-DANCE Y ENTRADAS SEGURAS (11.0 < dist <= 24.0 u)
+        # 11. NEUTRAL TÁCTICO: DASH-DANCE Y ENTRADAS SEGURAS (11.0 < dist <= 24.0 u)
         # (Requisito 8: NUNCA CAMINAR EN LÍNEA RECTA DE FRENTE AL JUGADOR)
         # =========================================================================
         elif dist <= 24.0:
@@ -2407,10 +2478,13 @@ class FlyBrain:
 
         if is_in_hitstun:
             asdi_y = 0.0 if (py <= 8.5 and getattr(player, "percent", 0.0) < 80.0) else 0.5
+            sdi_cycle = current_frame % 2
+            sdi_x = float(dir_to_stage) if sdi_cycle == 0 else 0.5
+            sdi_y = 0.85 if sdi_cycle == 0 else 0.15
             return self._enforce_safety({
-                "name": "🛡️ SURVIVAL DI HACIA EL ESCENARIO",
+                "name": "🛡️ SURVIVAL DI + SDI CUÁNTICO 20XX HACIA EL ESCENARIO",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": float(asdi_y), "stats": stats
+                "stick_x": float(sdi_x), "stick_y": float(sdi_y), "c_stick_x": 0.5, "c_stick_y": float(asdi_y), "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
         # Luigi capturado en agarre por el rival: Mash-out 20XX a 60 inputs/segundo
@@ -2623,10 +2697,26 @@ class FlyBrain:
             }
 
         # =========================================================================
-        # 3. L-CANCEL AUTOMÁTICO EN ATERRIZAJES DE ATAQUES AÉREOS
+        # 3. L-CANCEL & PLATFORM EDGE-CANCEL SLIDE A CERO FRAMES DE LAG
         # =========================================================================
         if any(aerial in act_str for aerial in ["NAIR", "DAIR", "UAIR", "BAIR", "FAIR"]) or (act_val in [65, 66, 67, 68, 69]):
-            is_near_landing = (0.0 <= py <= 8.5) or (22.0 <= py <= 32.0) or (48.0 <= py <= 60.0) or (BattlefieldMap.is_on_platform(px, py - 3.0) is not None)
+            is_on_plat_landing = BattlefieldMap.is_on_platform(px, py - 3.0, stage)
+            is_near_landing = (0.0 <= py <= 8.5) or (22.0 <= py <= 32.0) or (48.0 <= py <= 60.0) or (is_on_plat_landing is not None)
+            
+            # PLATFORM EDGE-CANCEL SLIDE: Si aterriza en el borde exacto de una plataforma con inercia:
+            h_speed = max(abs(getattr(player, "speed_ground_x_self", 0.0)), abs(getattr(player, "speed_air_x_self", 0.0)))
+            is_near_plat_edge = False
+            if is_on_plat_landing and h_speed > 0.40:
+                if abs(abs(px) - 19.5) < 3.5 or abs(abs(px) - 58.0) < 3.5 or abs(abs(px) - 19.0) < 3.5:
+                    is_near_plat_edge = True
+
+            if is_near_plat_edge:
+                return self._enforce_safety({
+                    "name": "⚡ PLATFORM EDGE-CANCEL: CANCELACIÓN A CERO FRAMES DE LAG",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
             if is_near_landing and getattr(player, "speed_y_self", 0) < -0.15:
                 return self._enforce_safety({
                     "name": "⚡ L-CANCEL PERFECTO (L)",
@@ -2649,6 +2739,18 @@ class FlyBrain:
                     "name": "🛡️ ESCUDO: ROLL DE EMERGENCIA (ANTI-BREAK)",
                     "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+            # A2) SHIELD DROP 20XX: Si Luigi está en escudo sobre una plataforma y el rival está abajo
+            luigi_plat = BattlefieldMap.is_on_platform(px, py, stage)
+            if luigi_plat and (oy < py - 3.5):
+                self.shield_frames = 0
+                self.learn_from_success("SHIELD_DROP")
+                return self._enforce_safety({
+                    "name": "🛡️ SHIELD DROP 20XX: DESCENSO INSTANTÁNEO ➔ COUNTER AÉREO",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.28, "c_stick_x": 0.5, "c_stick_y": 0.0,
+                    "_allow_drop_through": True, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             if dist <= 16.0:
@@ -3435,7 +3537,42 @@ class FlyBrain:
                     }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
-        # 10. COMBATE CUERPO A CUERPO CQC (dist <= 11.0 unidades)
+        # 10. POWERSHIELD REFLECT & ZERO SHIELD-STUN COUNTER (FRAME-1 REFLEJO DE PROYECTIL)
+        # =========================================================================
+        is_projectile = any(k in opp_act_str for k in ["LASER", "BLASTER", "MISSILE", "SPECIAL_N", "SPECIAL_S", "ITEM_THROW", "PILL", "TURNIP", "CHARGE_SHOT"]) or (opp_act_val in [341, 342, 343, 344, 345, 348, 349, 350])
+        is_ps_ready = (getattr(self, "powershield_state", None) == "POWERSHIELD_ACTIVE") and (current_frame - getattr(self, "powershield_frame", -100) <= 2)
+        if is_ps_ready and getattr(player, "on_ground", True):
+            self.powershield_state = None
+            self.learn_from_success("POWERSHIELD")
+            if dist <= 7.0:
+                self.dopamine = 1.0
+                self.last_luigi_power = "UPB_SHORYUKEN"
+                return self._enforce_safety({
+                    "name": "💥 POWERSHIELD COUNTER: ZERO SHIELD-STUN SWEETSPOT UP-B (PING!)",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                self.luigi_jump_action = "WAVEDASH"
+                self.luigi_jump_frame = current_frame
+                self.luigi_wd_dir = towards_opp
+                return self._enforce_safety({
+                    "name": "⚡ POWERSHIELD REFLECT: WAVEDASH ADELANTE TRAS REFLEJO",
+                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        if is_projectile and getattr(player, "on_ground", True):
+            self.powershield_state = "POWERSHIELD_ACTIVE"
+            self.powershield_frame = current_frame
+            return self._enforce_safety({
+                "name": "🛡️ POWERSHIELD FRAME-1: REFLEJO DE PROYECTIL (CERO SHIELD-STUN)",
+                "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
+        # =========================================================================
+        # 11. COMBATE CUERPO A CUERPO CQC (dist <= 11.0 unidades)
         # =========================================================================
         is_opp_attacking = ("ATTACK" in opp_act_str or "SWORD" in opp_act_str or "SPECIAL" in opp_act_str or opp_act_val in range(44, 75))
         is_opp_shielding = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
@@ -3557,7 +3694,7 @@ class FlyBrain:
             }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
-        # 11. NEUTRAL TÁCTICO: PODERES, ATAQUES AÉREOS & WAVEDASHING (11.0 < dist <= 24.0 u)
+        # 12. NEUTRAL TÁCTICO: PODERES, ATAQUES AÉREOS & WAVEDASHING (11.0 < dist <= 24.0 u)
         # =========================================================================
         elif dist <= 24.0:
             # 0. WHIFF PUNISH VIST: Si el rival está atacando al aire a distancia de whiff (11.0 < dist <= 14.5 o ampliado por whiff_punish_iq)
