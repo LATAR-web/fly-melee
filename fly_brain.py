@@ -1059,6 +1059,19 @@ class FlyBrain:
             if "THROW" in action.get("name", ""):
                 return action
 
+            # BARRERA ESTRICTA ANTI-SUICIDIO CON GREEN MISSILE PARA LUIGI:
+            # En Melee, Green Missile en tierra tiene un recorrido de 60-80u (o 150u en Misfire).
+            # Si se dispara con menos de 60.0u de pista hacia el borde, Luigi vuela al abismo en SPECIAL_FALL.
+            if is_luigi:
+                stick_x_val = action.get("stick_x", 0.5)
+                is_side_b = action.get("special", False) and (0.20 <= action.get("stick_y", 0.5) <= 0.80) and stick_x_val != 0.5
+                if is_side_b:
+                    dist_forward = (stage_edge - px) if stick_x_val > 0.5 else (stage_edge + px)
+                    if dist_forward < 60.0:
+                        action["special"] = False
+                        action["stick_x"] = 0.5 # Freno de seguridad para no correr al abismo
+                        action["name"] = "🛑 BARRERA ANTI-SUICIDIO: GREEN MISSILE CANCELADO (DISTANCIA AL BORDE INSEGURA)"
+
             # 1. BORDE DERECHO (px > 0)
             if px > 0:
                 dist_to_right_edge = stage_edge - px
@@ -3337,14 +3350,14 @@ class FlyBrain:
                 target_dir = getattr(self, "missile_target_dir", None)
                 missile_stick_x = float(target_dir if target_dir is not None else towards_opp)
                 
-                # Seguridad de distancia: si la distancia al borde en la dirección del misil es < 38.0, abortar
-                is_too_close_to_edge = (missile_stick_x > 0.5 and (stage_edge - px) < 38.0) or (missile_stick_x < 0.5 and (stage_edge + px) < 38.0)
+                # Seguridad de distancia: si la distancia al borde en la dirección del misil es < 58.0, abortar
+                is_too_close_to_edge = (missile_stick_x > 0.5 and (stage_edge - px) < 58.0) or (missile_stick_x < 0.5 and (stage_edge + px) < 58.0)
                 if is_too_close_to_edge and not is_def:
                     self.missile_charge_timer = 0
                     return self._enforce_safety({
                         "name": "🔥 ABORTO DE MISIL CERCA DEL BORDE ➔ BOLA DE FUEGO SEGURA",
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": missile_stick_x, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
                 # Disparar si alcanza la carga máxima o si un rival ofensivo se acerca demasiado durante carga
@@ -3409,7 +3422,7 @@ class FlyBrain:
 
             # 3. Si está fuera de alcance (dist > 16.0 u): INTERRUPCIÓN A DISTANCIA (PODER RECARGABLE O FUEGO)
             else:
-                missile_path_clear = (towards_opp > 0.5 and (stage_edge - px) > 42.0) or (towards_opp < 0.5 and (stage_edge + px) > 42.0)
+                missile_path_clear = abs(px) < 5.0 and ((towards_opp > 0.5 and (stage_edge - px) > 60.0) or (towards_opp < 0.5 and (stage_edge + px) > 60.0))
                 if current_frame % 2 == 1 and missile_path_clear:
                     self._start_missile_charge(current_frame)
                     return self._enforce_safety({
@@ -3421,7 +3434,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "🔥 INTERRUPCIÓN DE CARGA: BOLA DE FUEGO VERDE A DISTANCIA",
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
@@ -3598,14 +3611,15 @@ class FlyBrain:
                     "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
             else:
-                # Si el rival suele rodar hacia afuera (roll away), sprint / misil hacia su posición de aterrizaje
-                missile_path_clear = (towards_opp > 0.5 and (stage_edge - px) > 42.0) or (towards_opp < 0.5 and (stage_edge + px) > 42.0)
-                if (roll_away_freq > roll_in_freq + 2 or current_frame % 2 == 0 or self.dopamine > 0.65) and missile_path_clear:
-                    self._start_missile_charge(current_frame, max_charge=12)
+                # Si el rival suele rodar hacia afuera (roll away), castigo óptimo con Wavedash Down-Smash o Sprint
+                if (roll_away_freq > roll_in_freq + 2 or current_frame % 2 == 0 or self.dopamine > 0.65):
+                    self.luigi_jump_action = "WAVEDASH"
+                    self.luigi_jump_frame = current_frame
+                    self.luigi_wd_dir = towards_opp
                     return self._enforce_safety({
-                        "name": "🚀 TECH-CHASE: GREEN MISSILE TORPEDO RECARGABLE (SIDE-B)",
-                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "name": "💥 TECH-CHASE 20XX: WAVEDASH ADELANTE ➔ DOWN-SMASH TRAP",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 return self._enforce_safety({
                     "name": "🏃 TECH-CHASE: SPRINT AL RIVAL EN EL SUELO",
@@ -3675,7 +3689,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "🔥 EDGEGUARD: BOLA DE FUEGO VERDE AL ABISMO",
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
@@ -3883,14 +3897,12 @@ class FlyBrain:
                         "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # 2. PODER ESPECIAL RECARGABLE: GREEN MISSILE TORPEDO (SIDE-B) (18% probabilidad)
-            missile_path_clear = (towards_opp > 0.5 and (stage_edge - px) > 42.0) or (towards_opp < 0.5 and (stage_edge + px) > 42.0)
-            if 20 <= entropy < 38 and dist >= 13.0 and missile_path_clear:
-                self._start_missile_charge(current_frame, max_charge=14)
+            # 2. ZONIFICACIÓN NEUTRAL CON BOLA DE FUEGO VERDE (NEUTRAL-B SEGURO) (18% probabilidad)
+            if 20 <= entropy < 38 and dist >= 13.0:
                 return self._enforce_safety({
-                    "name": "🚀 PODER ESPECIAL RECARGABLE: GREEN MISSILE TORPEDO OFENSIVO (SIDE-B)",
+                    "name": "🔥 ZONIFICACIÓN NEUTRAL: BOLA DE FUEGO VERDE REBOTANTE",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             # 3. FINTA OFENSIVA: WAVEDASH ADELANTE ➔ SWEETSPOT UP-B SHORYUKEN DE FUEGO / CYCLONE (14% probabilidad)
@@ -3931,7 +3943,7 @@ class FlyBrain:
                 return self._enforce_safety({
                     "name": "🔥 ENTRADA NEUTRAL: BOLA DE FUEGO VERDE TÁCTICA",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             # 7. WAVEDASH BACK BAIT O RUSHDOWN ANTE RIVAL PASIVO (12% probabilidad)
@@ -3960,9 +3972,11 @@ class FlyBrain:
         # 12. DISTANCIA LARGA (dist > 24.0 u): PODERES DE ASALTO & APROXIMACIÓN
         # =========================================================================
         else:
-            # 1. Torpedo de aproximación recargable: GREEN MISSILE (Side-B) a toda velocidad
-            missile_path_clear = (towards_opp > 0.5 and (stage_edge - px) > 42.0) or (towards_opp < 0.5 and (stage_edge + px) > 42.0)
-            if current_frame % 40 < 18 and missile_path_clear:
+            # 1. Torpedo de aproximación recargable: GREEN MISSILE (Side-B)
+            # REGLA ESTRICTA ANTI-SUICIDIO: Solo desde el centro exacto del escenario (abs(px) < 5.0)
+            # con pista completa (> 60.0 u), para evitar SPECIAL_FALL offstage
+            missile_path_clear = abs(px) < 5.0 and ((towards_opp > 0.5 and (stage_edge - px) > 60.0) or (towards_opp < 0.5 and (stage_edge + px) > 60.0))
+            if (current_frame % 40 == 0 or current_frame == 440) and missile_path_clear:
                 self._start_missile_charge(current_frame, max_charge=18)
                 return self._enforce_safety({
                     "name": "🚀 PODER ESPECIAL RECARGABLE: GREEN MISSILE TORPEDO DE ASALTO (SIDE-B)",
@@ -3996,7 +4010,7 @@ class FlyBrain:
                 return self._enforce_safety({
                     "name": "🔥 ZONING PROFESIONAL: BOLA DE FUEGO VERDE",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             # 4. Wavedash Rushdown deslizante (0.005 de fricción para cruzar el escenario al instante)
