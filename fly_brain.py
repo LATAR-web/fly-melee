@@ -652,6 +652,8 @@ class FlyBrain:
         self.missile_charge_timer = 0
         self.missile_charge_frame = -100
         self.grab_pummel_count = 0
+        self.jab_reset_active = False
+        self.jab_reset_frame = -100
 
     def _set_luigi_jump(self, action_name, current_frame):
         """Registra la acción aérea en cola y el frame en que se inició para ejecución inmediata al despegar."""
@@ -998,6 +1000,7 @@ class FlyBrain:
         action["stick_y"] = float(action.get("stick_y", 0.5))
         action["c_stick_x"] = float(action.get("c_stick_x", 0.5))
         action["c_stick_y"] = float(action.get("c_stick_y", 0.5))
+        action["taunt"] = bool(action.get("taunt", False))
 
         return action
 
@@ -1120,7 +1123,7 @@ class FlyBrain:
         act_val = getattr(player.action, "value", getattr(player, "act_val", 0))
         opp_act_val = getattr(opponent.action, "value", getattr(opponent, "act_val", 0))
         action_frame = getattr(player, "action_frame", 1)
-        opp_offstage = getattr(opponent, "off_stage", False)
+        opp_offstage = getattr(opponent, "off_stage", False) or (abs(ox) >= (stage_edge - 1.0) and oy < 1.0) or ("EDGE" in opp_act_str) or (opp_act_val in [252, 253])
         opp_char = getattr(opponent, "character", None)
         archetype = BattlefieldMap.get_character_archetype(opp_char)
         self.combo_archetype = archetype
@@ -1143,13 +1146,19 @@ class FlyBrain:
                 "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }
 
-        # SWAGGER 20XX: Si el rival está muerto o en halo de respawn, mantener dash-dance a máxima velocidad
+        # SWAGGER 20XX: Si el rival está muerto o en halo de respawn, alternar taunt y dash-dance
         opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str)
         if opp_on_halo and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 14.0):
+            if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                return self._enforce_safety({
+                    "name": "🦊 SWAGGER 20XX: FOX TAUNT (COME ON! HUMILLACIÓN MENTAL)",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
             dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
             return self._enforce_safety({
                 "name": "🦊 SWAGGER 20XX: DASH-DANCE DE DOMINANCIA EN CENTRO",
-                "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
                 "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
@@ -2224,7 +2233,7 @@ class FlyBrain:
         opp_act_str = str(opponent.action)
         act_val = getattr(player.action, "value", getattr(player, "act_val", 0))
         opp_act_val = getattr(opponent.action, "value", getattr(opponent, "act_val", 0))
-        opp_offstage = getattr(opponent, "off_stage", False)
+        opp_offstage = getattr(opponent, "off_stage", False) or (abs(ox) >= (stage_edge - 1.0) and oy < 1.0) or ("EDGE" in opp_act_str) or (opp_act_val in [252, 253])
         opp_char = getattr(opponent, "character", None)
         archetype = BattlefieldMap.get_character_archetype(opp_char)
         self.combo_archetype = archetype
@@ -2260,11 +2269,17 @@ class FlyBrain:
 
         opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str)
         if opp_on_halo and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 14.0):
-            # SWAGGER LUIGI 20XX: Deslizamiento de Wavedash infinito por el escenario
+            # SWAGGER LUIGI 20XX: Alternar Disrespect Taunt y Wavedash Dance
+            if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                return self._enforce_safety({
+                    "name": "👟 DISRESPECT EN RESPAWN: LUIGI TAUNT (HUMILLACIÓN MENTAL)",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
             dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
             return self._enforce_safety({
                 "name": "🟢 SWAGGER LUIGI 20XX: WAVEDASH DE DOMINANCIA EN CENTRO",
-                "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False,
+                "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False, "taunt": False,
                 "stick_x": float(dance_x), "stick_y": 0.25 if (current_frame % 4 == 0) else 0.5,
                 "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
@@ -2447,7 +2462,7 @@ class FlyBrain:
             if abs(px) > (stage_edge + 14.0) and py > -22.0:
                 return {
                     "name": "🌪️ RISING LUIGI CYCLONE: MASHING DOWN-B DE RETORNO",
-                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False, "taunt": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
@@ -3076,6 +3091,28 @@ class FlyBrain:
         # =========================================================================
         # 8. TECH-CHASE & CASTIGO A RIVAL DERRIBADO (JAB-RESET Y DOWN-SMASH)
         # =========================================================================
+        is_opp_in_reset_stand = getattr(self, "jab_reset_active", False) and (current_frame - getattr(self, "jab_reset_frame", -100) <= 35)
+        if is_opp_in_reset_stand and getattr(player, "on_ground", True):
+            if dist <= 6.5 and (opp_pct >= 35.0 or self.dopamine > 0.50):
+                self.jab_reset_active = False
+                self.last_luigi_power = "UPB_SHORYUKEN"
+                self.dopamine = 1.0
+                self.learn_from_success("KO")
+                return self._enforce_safety({
+                    "name": "💥 JAB-RESET KILL CONFIRM: SWEETSPOT UP-B SHORYUKEN (PING! DESTRUCCIÓN TOTAL)",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False, "taunt": False,
+                    "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            elif dist > 6.5 and abs(px) < (stage_edge - 14.0):
+                self.luigi_jump_action = "WAVEDASH"
+                self.luigi_wd_dir = towards_opp
+                self.luigi_jump_frame = current_frame
+                return self._enforce_safety({
+                    "name": "⚡ JAB-RESET SETUP: WAVEDASH A QUEMARROPA ➔ UP-B PING",
+                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
         is_opp_knockdown = (opp_act_val in range(183, 203)) or any(k in opp_act_str for k in [
             "DOWN", "LYING", "TECH", "GROUND_ROLL"
         ])
@@ -3097,6 +3134,8 @@ class FlyBrain:
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 if current_frame % 2 == 1 or missed_tech_freq > 3:
+                    self.jab_reset_active = True
+                    self.jab_reset_frame = current_frame
                     return self._enforce_safety({
                         "name": "🥊 JAB-RESET FRAME-2 (FORZAR LEVANTAMIENTO)",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
@@ -3146,6 +3185,17 @@ class FlyBrain:
         if opp_is_falling or opp_offstage or is_opp_on_ledge:
             offstage_aggro = self.get_plasticity("offstage_aggression", 1.50)
             if is_opp_on_ledge:
+                # 0. DISRESPECT SUPREMO: LUIGI DOWN-TAUNT METEOR SPIKE (Frame 45 Ledge Spike)
+                # Si Luigi está al borde del abismo y la dopamina es alta (>0.60), desciende el tacón de la humillación
+                is_right_at_edge = abs(px) >= (stage_edge - 6.5) and getattr(player, "on_ground", True)
+                if is_right_at_edge and (self.dopamine >= 0.70 or (current_frame % 4 == 0 and self.dopamine >= 0.50)):
+                    self.learn_from_success("EDGEGUARD")
+                    return self._enforce_safety({
+                        "name": "👟 DISRESPECT SUPREMO: LUIGI DOWN-TAUNT METEOR SPIKE (HUMILLACIÓN 20XX)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                        "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
                 # Lectura de hábitos en repisa
                 if habits.get("ledge_attack_freq", 0) > 3 or (current_frame % 2 == 0 and opp_pct < 60.0):
                     return self._enforce_safety({

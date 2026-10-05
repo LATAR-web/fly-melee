@@ -1304,8 +1304,63 @@ def run_tests():
     assert "CYCLONE" in act_aerial_cyclone["name"]
     print("✅ TEST 62 SUPERADO: Luigi ejecuta correctamente su Cyclone aéreo cuando fue seleccionado en salto.")
 
+    # -------------------------------------------------------------
+    # TEST 63: Luigi Down-Taunt Meteor Spike en Ledge (Disrespect 20XX)
+    # -------------------------------------------------------------
+    print("\n--- Test 63: Luigi Down-Taunt Meteor Spike en Repisa ---")
+    p_luigi_at_edge = MockPlayer(x=65.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_at_edge.character = "LUIGI"
+    p_opp_on_ledge = MockPlayer(x=68.4, y=-3.0, on_ground=False, action="EDGE_HANGING", act_val=253)
+    brain.dopamine = 0.85
+    act_taunt_spike = brain.get_luigi_decision(player=p_luigi_at_edge, opponent=p_opp_on_ledge, current_frame=1000, stage="BATTLEFIELD")
+    print(f"Luigi Ledge Disrespect: {act_taunt_spike['name']} | Taunt={act_taunt_spike.get('taunt')}")
+    assert act_taunt_spike.get("taunt") and "DOWN-TAUNT METEOR SPIKE" in act_taunt_spike["name"]
+    print("✅ TEST 63 SUPERADO: Luigi ejecuta el Down-Taunt Meteor Spike frame-45 en repisa para máxima humillación.")
+
+    # -------------------------------------------------------------
+    # TEST 64: Luigi Jab-Reset ➔ Shoryuken Kill Confirm
+    # -------------------------------------------------------------
+    print("\n--- Test 64: Luigi Jab-Reset ➔ Shoryuken Kill Confirm ---")
+    brain.jab_reset_active = True
+    brain.jab_reset_frame = 1010
+    p_luigi_reset_follow = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_reset_follow.character = "LUIGI"
+    p_opp_reset_standing = MockPlayer(x=3.0, y=0.0, on_ground=True, action="DOWN_WAIT", act_val=183, percent=55.0)
+    act_reset_confirm = brain.get_luigi_decision(player=p_luigi_reset_follow, opponent=p_opp_reset_standing, current_frame=1015, stage="BATTLEFIELD")
+    print(f"Luigi Jab-Reset Confirm: {act_reset_confirm['name']} | Special={act_reset_confirm['special']}, Stick Y={act_reset_confirm['stick_y']}")
+    assert act_reset_confirm["special"] and act_reset_confirm["stick_y"] == 1.0 and "JAB-RESET KILL CONFIRM" in act_reset_confirm["name"]
+    print("✅ TEST 64 SUPERADO: Luigi buferiza el Sweetspot Up-B Shoryuken inmediatamente tras forzar el levantamiento con Jab-Reset.")
+
+    # -------------------------------------------------------------
+    # TEST 65: Luigi Swagger Taunt en Respawn del Rival
+    # -------------------------------------------------------------
+    print("\n--- Test 65: Luigi Respawn Swagger Taunt ---")
+    p_luigi_swagger = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_swagger.character = "LUIGI"
+    p_opp_halo = MockPlayer(x=0.0, y=35.0, on_ground=True, action="HALO_WAIT", act_val=12)
+    brain.dopamine = 0.75
+    # frame 1050: (1050 // 35) % 2 == 30 % 2 == 0 -> Taunt
+    act_luigi_swagger = brain.get_luigi_decision(player=p_luigi_swagger, opponent=p_opp_halo, current_frame=1050, stage="BATTLEFIELD")
+    print(f"Luigi Respawn Swagger: {act_luigi_swagger['name']} | Taunt={act_luigi_swagger.get('taunt')}")
+    assert act_luigi_swagger.get("taunt") and "LUIGI TAUNT" in act_luigi_swagger["name"]
+    print("✅ TEST 65 SUPERADO: Luigi humilla mentalmente al rival con Taunt en respawn.")
+
+    # -------------------------------------------------------------
+    # TEST 66: Fox Swagger Taunt ("Come on!") en Respawn del Rival
+    # -------------------------------------------------------------
+    print("\n--- Test 66: Fox Respawn Swagger Taunt ---")
+    p_fox_swagger = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_swagger.character = "FOX"
+    brain.active_character = "FOX"
+    brain.dopamine = 0.75
+    act_fox_swagger = brain.get_controller_decision(player=p_fox_swagger, opponent=p_opp_halo, current_frame=1050, stage="BATTLEFIELD")
+    print(f"Fox Respawn Swagger: {act_fox_swagger['name']} | Taunt={act_fox_swagger.get('taunt')}")
+    assert act_fox_swagger.get("taunt") and "FOX TAUNT" in act_fox_swagger["name"]
+    brain.active_character = "LUIGI"
+    print("✅ TEST 66 SUPERADO: Fox ejecuta su icónico taunt 'Come on!' ante el respawn del rival.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (62/62 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (66/66 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

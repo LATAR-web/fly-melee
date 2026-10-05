@@ -609,11 +609,17 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     if action.get("attack"):
                         controller_fly.press_button(melee.Button.BUTTON_A)
                     if action.get("special"):
-                        controller_fly.press_button(melee.Button.BUTTON_B)
+                        if "MASHING" in action.get("name", ""):
+                            if step_count % 2 == 0:
+                                controller_fly.press_button(melee.Button.BUTTON_B)
+                        else:
+                            controller_fly.press_button(melee.Button.BUTTON_B)
                     if action.get("shield"):
                         controller_fly.press_button(melee.Button.BUTTON_L)
                     if action.get("grab"):
                         controller_fly.press_button(melee.Button.BUTTON_Z)
+                    if action.get("taunt"):
+                        controller_fly.press_button(melee.Button.BUTTON_D_UP)
                         
                     controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, action["stick_x"], action["stick_y"])
                     controller_fly.tilt_analog(melee.Button.BUTTON_C, action["c_stick_x"], action["c_stick_y"])
