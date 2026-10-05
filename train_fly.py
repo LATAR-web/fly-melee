@@ -146,6 +146,37 @@ def simulate_match(brain, fly_char="LUIGI", c_name="FOX", st_name="BATTLEFIELD",
         brain.learn_from_success("KO")
 
     # -----------------------------------------------------------------
+    # FASE 2B: AGARRE TÁCTICO SITUACIONAL (GOLPEA PUMMEL VS AVIENTA THROW)
+    # -----------------------------------------------------------------
+    # Situación A: Agarre al borde -> Avienta directo al abismo (F-Throw / B-Throw)
+    p_fly_edge_grab = MockPlayer(x=stage_edge - 12.0, y=0.0, on_ground=True, action="GRAB_WAIT", act_val=213)
+    p_fly_edge_grab.character = fly_char
+    p_opp_edge_grab = MockPlayer(x=stage_edge - 8.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=30.0)
+    p_opp_edge_grab.character = c_name
+    act_edge_throw = brain.get_controller_decision(player=p_fly_edge_grab, opponent=p_opp_edge_grab, current_frame=match_frame_base + 15, stage=st_name)
+    if "FORWARD-THROW" in act_edge_throw["name"] or "BACK-THROW" in act_edge_throw["name"] or "AL ABISMO" in act_edge_throw["name"]:
+        match_kos += 1
+        brain.learn_from_success("EDGEGUARD", value=2.0)
+
+    # Situación B: Agarre al centro a 70% -> Golpea (pummel con Botón A)
+    p_fly_cntr_grab = MockPlayer(x=0.0, y=0.0, on_ground=True, action="GRAB_WAIT", act_val=213)
+    p_fly_cntr_grab.character = fly_char
+    p_opp_cntr_grab = MockPlayer(x=3.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=70.0)
+    p_opp_cntr_grab.character = c_name
+    brain.grab_pummel_count = 0
+    act_p1 = brain.get_controller_decision(player=p_fly_cntr_grab, opponent=p_opp_cntr_grab, current_frame=match_frame_base + 16, stage=st_name)
+    if act_p1.get("attack") or "PUMMEL" in act_p1["name"]:
+        match_combos += 1
+        brain.learn_from_success("PUMMEL", value=2.0)
+
+    # Situación C: La mosca es capturada por el rival -> Mash-out escape 20XX
+    p_fly_cap = MockPlayer(x=0.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=40.0)
+    p_fly_cap.character = fly_char
+    act_mash = brain.get_controller_decision(player=p_fly_cap, opponent=p_opp_neut, current_frame=match_frame_base + 17, stage=st_name)
+    if "MASH-OUT" in act_mash["name"] or act_mash.get("jump") or act_mash.get("attack") or act_mash.get("special"):
+        brain.learn_from_success("SAFE_RECOVERY", value=1.5)
+
+    # -----------------------------------------------------------------
     # FASE 3: COMBO & CASTIGO ESPECÍFICO DE ARCHETYPE
     # -----------------------------------------------------------------
     start_pct = random.uniform(25.0, 70.0)
@@ -465,6 +496,45 @@ def run_techchase_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
     print(f"\n✅ Drill Tech-Chase completado en {dt:.2f} s.")
     print_status_summary(brain, fly_char=fly_char_upper)
 
+def run_grab_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """
+    Entrenamiento táctico situacional de Agarres y Lanzamientos 20XX.
+    Decide con precisión milimétrica según la situación:
+      - Borde del escenario: Avienta directo al abismo (Forward-Throw o Back-Throw) sin regalar mash-out.
+      - Centro a bajo %: Avienta directo a Down-Throw para iniciar el combo sin dar tiempo a zafarse.
+      - Centro a medio/alto %: Golpea pummels óptimos (1-3 con Botón A) y avienta a confirmación de K.O.
+      - Mosca capturada: Zafada frame-perfect con Mash-Out 20XX y Survival DI.
+    """
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "🤼 ENTRENAMIENTO DE AGARRES & LANZAMIENTOS TÁCTICOS 20XX",
+        f"{num_reps} Repeticiones | Decisiones Situacionales: Golpear (Pummel) vs Aventar (Throw)"
+    )
+
+    t0 = time.time()
+    targets = list(MELEE_CHARACTERS.keys())
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="grab", match_num=i)
+        grab_p = brain.get_plasticity("grab_combo_lethality", 1.70)
+        combo_p = brain.get_plasticity("combo_mastery", 1.60)
+        if i % 3 == 1:
+            desc = "Al Borde ➔ Avienta al Vacío (F/B-Throw)"
+        elif i % 3 == 2:
+            desc = "Al Centro ➔ Golpea Pummels + Avienta a Combo"
+        else:
+            desc = "Rival Agarra ➔ Mash-Out Escape 20XX"
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | {desc:<44} | Grab IQ: {grab_p:.2f}x | Combo: {combo_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill de Agarres & Lanzamientos completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
 def run_full_training(num_matches=50, cpu_level=9, fly_character="luigi"):
     """Entrenamiento general multi-fase contra todo el roster de Melee."""
     fly_char_upper = fly_character.upper()
@@ -504,7 +574,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Entrenador Biológico Neural Acelerado para la Mosca (Drosophila 400k) 20XX")
     parser.add_argument("matches", type=int, nargs="?", default=50, help="Número de partidas a entrenar (por defecto: 50)")
     parser.add_argument("--matches", "-m", dest="matches_opt", type=int, default=None, help="Número de partidas")
-    parser.add_argument("--mode", choices=["full", "gauntlet", "spacies", "whiff", "edgeguard", "techchase"], default="full", help="Modo o drill de entrenamiento especializado")
+    parser.add_argument("--mode", choices=["full", "gauntlet", "spacies", "whiff", "edgeguard", "techchase", "grab", "throw", "throws"], default="full", help="Modo o drill de entrenamiento especializado")
     parser.add_argument("--cpu", "-c", type=int, default=9, help="Nivel de dificultad del Bot CPU rival (1-9)")
     parser.add_argument("--character", "-k", default="luigi", choices=["luigi", "fox"], help="Personaje de la mosca (luigi o fox)")
     args = parser.parse_args()
@@ -522,5 +592,7 @@ if __name__ == "__main__":
         run_edgeguard_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
     elif args.mode == "techchase":
         run_techchase_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode in ["grab", "throw", "throws"]:
+        run_grab_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
     else:
         run_full_training(num_matches=num, cpu_level=args.cpu, fly_character=args.character)

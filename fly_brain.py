@@ -948,6 +948,10 @@ class FlyBrain:
 
         # --- A) EN EL SUELO: CONTROL ESTRICTO DE BORDES Y PODERES SUICIDAS ---
         if on_ground and py >= -2.0:
+            # Los lanzamientos (Throws) son animaciones terrestres fijas; no deben frenar el stick de lanzamiento
+            if "THROW" in action.get("name", ""):
+                return action
+
             # 1. BORDE DERECHO (px > 0)
             if px > 0:
                 dist_to_right_edge = stage_edge - px
@@ -1233,6 +1237,36 @@ class FlyBrain:
             # Survival DI hacia el centro/arriba
             return self._enforce_safety({
                 "name": "🛡️ SURVIVAL DI HACIA EL ESCENARIO",
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
+        # Fox capturado en agarre por el rival: Mash-out 20XX a 60 inputs/segundo
+        is_captured = (act_val in range(223, 230)) or ("CAPTURE" in act_str)
+        if is_captured:
+            mash_cycle = current_frame % 4
+            mash_x = 0.0 if mash_cycle in [0, 1] else 1.0
+            mash_y = 0.85 if mash_cycle in [1, 2] else 0.15
+            mash_btn_a = (mash_cycle % 2 == 0)
+            mash_btn_b = (mash_cycle % 2 == 1)
+            return self._enforce_safety({
+                "name": "⚡ MASH-OUT ESCAPE 20XX: ZAFARSE DEL AGARRE A VELOCIDAD RÉCORD",
+                "jump": (mash_cycle == 0),
+                "attack": mash_btn_a,
+                "special": mash_btn_b,
+                "shield": False,
+                "grab": False,
+                "stick_x": float(mash_x),
+                "stick_y": float(mash_y),
+                "c_stick_x": 0.5,
+                "c_stick_y": 0.5,
+                "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
+        is_being_thrown = (act_val in range(230, 234)) or ("THROWN" in act_str)
+        if is_being_thrown:
+            return self._enforce_safety({
+                "name": "🛡️ SURVIVAL DI AL LANZAMIENTO HACIA EL ESCENARIO",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
                 "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
@@ -2379,6 +2413,36 @@ class FlyBrain:
                 "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": float(asdi_y), "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
+        # Luigi capturado en agarre por el rival: Mash-out 20XX a 60 inputs/segundo
+        is_captured = (act_val in range(223, 230)) or ("CAPTURE" in act_str)
+        if is_captured:
+            mash_cycle = current_frame % 4
+            mash_x = 0.0 if mash_cycle in [0, 1] else 1.0
+            mash_y = 0.85 if mash_cycle in [1, 2] else 0.15
+            mash_btn_a = (mash_cycle % 2 == 0)
+            mash_btn_b = (mash_cycle % 2 == 1)
+            return self._enforce_safety({
+                "name": "⚡ MASH-OUT ESCAPE 20XX: ZAFARSE DEL AGARRE A VELOCIDAD RÉCORD",
+                "jump": (mash_cycle == 0),
+                "attack": mash_btn_a,
+                "special": mash_btn_b,
+                "shield": False,
+                "grab": False,
+                "stick_x": float(mash_x),
+                "stick_y": float(mash_y),
+                "c_stick_x": 0.5,
+                "c_stick_y": 0.5,
+                "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
+        is_being_thrown = (act_val in range(230, 234)) or ("THROWN" in act_str)
+        if is_being_thrown:
+            return self._enforce_safety({
+                "name": "🛡️ SURVIVAL DI AL LANZAMIENTO HACIA EL ESCENARIO",
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                "stick_x": float(dir_to_stage), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
         if is_tumbling:
             if is_offstage:
                 if getattr(player, "jumps_left", 0) > 0:
@@ -2650,13 +2714,35 @@ class FlyBrain:
         opp_pct = float(getattr(opponent, "percent", 0.0))
 
         if is_grabbing:
-            # Calcular número óptimo de pummels según el porcentaje del rival para maximizar daño sin arriesgar mash-out
-            max_pummels = 1 if opp_pct < 25.0 else (2 if opp_pct < 60.0 else (3 if opp_pct < 90.0 else 4))
+            is_near_edge = abs(px) > (stage_edge - 16.0)
+            edge_dir = 1.0 if px > 0 else 0.0
+            is_facing_edge = (px > 0 and towards_opp > 0.5) or (px < 0 and towards_opp < 0.5)
+
+            # DECISIÓN SITUACIONAL 20XX: ¿GOLPEA (PUMMEL) O AVIENTA (THROW)?
+            # 1. Al borde del escenario (Edge Zone):
+            #    - Si el rival tiene bajo/medio daño (<60%): AVIENTA DE INMEDIATO al abismo (0 pummels)
+            #      para evitar zafadas de mash-out sobre la plataforma.
+            #    - Si tiene daño alto (>=60%): 1 pummel rápido de ventaja y avienta fuera.
+            # 2. Al centro del escenario:
+            #    - Si tiene muy poco daño (<20%): Avienta de inmediato a Down-Throw combo sin regalar mash-out.
+            #    - A daño medio (20% <= % < 55%): Golpea 2 pummels antes de aventar.
+            #    - A daño medio-alto (55% <= % < 95%): Golpea 3 pummels (cumple Test 56 con 70%).
+            #    - A daño crítico (>= 95%): Golpea hasta 4 pummels para exprimir 12% extra.
+            if is_near_edge:
+                max_pummels = 0 if opp_pct < 60.0 else 1
+            elif opp_pct < 20.0:
+                max_pummels = 0
+            elif opp_pct < 55.0:
+                max_pummels = 2
+            elif opp_pct < 95.0:
+                max_pummels = 3
+            else:
+                max_pummels = 4
+
             curr_pummels = getattr(self, "grab_pummel_count", 0)
 
-            # Si aún no hemos alcanzado el número máximo de pummels:
+            # A) FASE GOLPEAR (PUMMEL CON BOTÓN A):
             if curr_pummels < max_pummels:
-                # Si está en GRAB_WAIT o GRAB_PULL: emitir golpe de pummel con Botón A
                 if act_val in [213, 215, 216, 226] or "WAIT" in act_str or "PULL" in act_str:
                     self.grab_pummel_count = curr_pummels + 1
                     self.dopamine = min(1.0, self.dopamine + 0.10)
@@ -2674,16 +2760,23 @@ class FlyBrain:
                         "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # Una vez completados los pummels, proceder al lanzamiento letal:
-            if abs(px) > (stage_edge - 16.0):
-                self.grab_pummel_count = 0
-                return self._enforce_safety({
-                    "name": "🤼 BACK-THROW AL ABISMO (EDGEGUARD SETUP)",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(1.0 - towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+            # B) FASE AVENTAR (LANZAMIENTO SITUACIONAL):
+            self.grab_pummel_count = 0
+            if is_near_edge:
+                # Lanzar directamente fuera del escenario hacia el abismo:
+                if is_facing_edge:
+                    return self._enforce_safety({
+                        "name": "🤼 FORWARD-THROW AL ABISMO (EDGEGUARD SETUP)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🤼 BACK-THROW AL ABISMO (EDGEGUARD SETUP)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
             else:
-                self.grab_pummel_count = 0
                 self.combo_state = "LUIGI_DTHROW_COMBO"
                 self.combo_timer = 0
                 return self._enforce_safety({

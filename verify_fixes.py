@@ -1468,8 +1468,45 @@ def run_tests():
     assert act_drill_shine["special"] and act_drill_shine["stick_y"] == 0.0 and "DRILL-SHINE SHIELD PRESSURE" in act_drill_shine["name"]
     print("✅ TEST 71 SUPERADO: Fox ejecuta Drill-Shine Frame-1 en el aterrizaje para neutralizar el escudo rival.")
 
+    # -------------------------------------------------------------
+    # TEST 72: Luigi Grab Situacional (Pummel vs Throw Táctico al Borde)
+    # -------------------------------------------------------------
+    print("\n--- Test 72: Luigi Grab Situacional (Pummel vs Throw Táctico) ---")
+    brain.grab_pummel_count = 0
+    # Caso A: Luigi al borde derecho (X = 56.0, edge = 68.4) mirando al abismo (+X):
+    # Rival a bajo % (30%) -> Avienta directo al abismo con Forward-Throw sin regalar mash-out
+    p_luigi_edge_f = MockPlayer(x=56.0, y=0.0, on_ground=True, action="GRAB_WAIT", act_val=213)
+    p_luigi_edge_f.character = "LUIGI"
+    p_opp_edge_f = MockPlayer(x=59.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=30.0)
+    act_throw_f = brain.get_luigi_decision(player=p_luigi_edge_f, opponent=p_opp_edge_f, current_frame=1180, stage="BATTLEFIELD")
+    print(f"Lanzamiento al Borde (Mirando Afuera): {act_throw_f['name']} | Stick X={act_throw_f['stick_x']}")
+    assert not act_throw_f["attack"] and act_throw_f["stick_x"] == 1.0 and "FORWARD-THROW AL ABISMO" in act_throw_f["name"]
+
+    # Caso B: Luigi al borde derecho (X = 60.0) pero de espaldas al abismo (rival hacia el centro en X = 57.0):
+    # Rival a bajo % (30%) -> Avienta directo al abismo con Back-Throw hacia afuera (+X)
+    brain.grab_pummel_count = 0
+    p_luigi_edge_b = MockPlayer(x=60.0, y=0.0, on_ground=True, action="GRAB_WAIT", act_val=213)
+    p_luigi_edge_b.character = "LUIGI"
+    p_opp_edge_b = MockPlayer(x=57.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=30.0)
+    act_throw_b = brain.get_luigi_decision(player=p_luigi_edge_b, opponent=p_opp_edge_b, current_frame=1181, stage="BATTLEFIELD")
+    print(f"Lanzamiento al Borde (Espalda Afuera): {act_throw_b['name']} | Stick X={act_throw_b['stick_x']}")
+    assert not act_throw_b["attack"] and act_throw_b["stick_x"] == 1.0 and "BACK-THROW AL ABISMO" in act_throw_b["name"]
+    print("✅ TEST 72 SUPERADO: Luigi decide situacionalmente aventar directo al abismo con F-Throw o B-Throw.")
+
+    # -------------------------------------------------------------
+    # TEST 73: Mash-Out 20XX y Survival DI cuando la Mosca es Agarrada
+    # -------------------------------------------------------------
+    print("\n--- Test 73: Mash-Out 20XX cuando la Mosca es Agarrada ---")
+    p_fly_held = MockPlayer(x=0.0, y=0.0, on_ground=True, action="CAPTURE_WAIT", act_val=224, percent=45.0)
+    p_fly_held.character = "LUIGI"
+    p_opp_holder = MockPlayer(x=3.0, y=0.0, on_ground=True, action="GRAB_WAIT", act_val=213)
+    act_mashout = brain.get_luigi_decision(player=p_fly_held, opponent=p_opp_holder, current_frame=1190, stage="BATTLEFIELD")
+    print(f"Respuesta a Captura: {act_mashout['name']} | Attack={act_mashout['attack']}, Jump={act_mashout['jump']}")
+    assert "MASH-OUT ESCAPE 20XX" in act_mashout["name"]
+    print("✅ TEST 73 SUPERADO: La mosca ejecuta Mash-Out frame-perfect a 60 inputs/s para zafarse del agarre.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (71/71 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (73/73 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":
