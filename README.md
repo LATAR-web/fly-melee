@@ -6,16 +6,19 @@ El conectoma biológico decodifica la percepción visual del combate, procesa la
 
 ---
 
-## 🌐 Inicio Rápido: Panel Web 3D & Arena en Vivo
+## 🚀 Inicio Rápido: Jugar en Dolphin & Panel Web en Vivo
 
-Para iniciar la simulación y visualizar el cerebro en 3D junto con la arena de combate en tiempo real, ejecuta un solo comando:
+Para arrancar el juego en Dolphin y visualizar la telemetría biológica en 3D:
 
 ```bash
 ./start_fly.sh
 ```
 
-Esto iniciará el servidor local y abrirá automáticamente tu navegador en:
-👉 **`http://localhost:8085`**
+Esto ejecuta automáticamente:
+1. **Emulador Dolphin**: Inicia *Super Smash Bros. Melee* con la mosca conectada en el Puerto 1 y tus controles listos en el Puerto 2.
+2. **Panel Web 3D**: Abre automáticamente tu navegador en **`http://localhost:8085`** sincronizado a 60 FPS con el combate.
+
+*(Si solo deseas abrir el panel web sin el emulador Dolphin, puedes ejecutar `./start_fly.sh --web`).*
 
 ### ¿Qué incluye el Panel Web?
 - **🧠 Conectoma 3D Interactivo (Three.js WebGL)**: Explora las 400,000 neuronas anatómicas, rota con el ratón o touchpad, haz zoom e inspecciona los circuitos neuronales iluminándose en vivo según cada decisión motora (Salto `DNp01`, Ataque, Reflector, Escudo).

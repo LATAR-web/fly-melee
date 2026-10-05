@@ -29,8 +29,8 @@ import http.client
 import urllib.request
 from fly_brain import FlyBrain
 
-DEFAULT_ISO = "/home/ltar/projects/fly-melee/data/games/ssbm.iso"
-DOLPHIN_HOME = "/home/ltar/.config/SlippiOnline"
+DEFAULT_ISO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "games", "ssbm.iso")
+DOLPHIN_HOME = os.path.expanduser("~/.config/SlippiOnline")
 DASHBOARD_URL = "http://127.0.0.1:8085/api/push_state"
 
 class TelemetryClient:
@@ -368,6 +368,11 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
     
     # 2. Inicializar consola de Dolphin usando DOLPHIN_HOME
     print("\n⏳ Inicializando consola Dolphin...")
+    if not dolphin_path:
+        local_apprun = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dolphin", "AppRun")
+        if os.path.exists(local_apprun):
+            dolphin_path = local_apprun
+
     console = melee.Console(
         path=dolphin_path,
         fullscreen=False,
