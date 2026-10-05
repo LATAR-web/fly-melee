@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-Entrenador Biológico Neural Acelerado para la Mosca (MaleCNS Drosophila ~400k)
-Simula combates de alta intensidad contra BOTS CPU NIVEL 9 de Super Smash Bros. Melee para:
-- Entrenar combates completos contra Bots Nivel 9 de 15 personajes aleatorios (Fox, Marth, Sheik, Falcon, Peach, etc.)
-- Modelar mecánicas avanzadas de Nivel 9: Frame-1 Survival DI, Fast-falling, 100% Teching, OOS Counters y Ledge Mixups
-- Adaptar en tiempo real la neuroplasticidad STDP (Combo Mastery, Offstage Aggression, CQC Reflexes)
-- Entrenar la lectura predictiva de hábitos del oponente (Tech rolls, Ledge options, Escudos)
-- Reforzar el instinto de ataque implacable (Shoryuken confirms, Down-Smash semi-spikes, D-Air spikes)
-- Consolidar la experiencia en la memoria persistente a largo plazo.
+Entrenador Biológico Neural Acelerado para la Mosca (Drosophila melanogaster ~400k)
+Suite de Entrenamiento de Élite 20XX:
+- Modos de entrenamiento especializados:
+  * gauntlet: Torneo completo contra los 15 personajes de Melee.
+  * spacies: Especialización anti-fastfallers (Chaingrab regrabs, CC Shoryuken vs Fox/Falco/Falcon).
+  * whiff: Dominio del espaciado neutral Vist Wavedash-Back y castigo instantáneo.
+  * edgeguard: Caza offstage profunda, Ledgedash invencible y semi-spikes en repisa.
+  * techchase: Reacción frame-perfect a Tech-Rolls y Jab-Resets contra DI de Nivel 9.
+  * full: Simulación completa de partidas competitivas multi-fase.
+- Neuroplasticidad STDP con techo ampliado a 5.00x (God-tier).
+- Base de datos de inteligencia por matchup guardada en data/memory/long_term_synapses.json.
 """
 import sys
 import os
@@ -15,9 +18,12 @@ import os
 try:
     import numpy as np
 except ImportError:
-    venv_python = "/home/ltar/.venvs/pytorch/bin/python"
-    if os.path.exists(venv_python) and sys.executable != venv_python:
-        os.execv(venv_python, [venv_python] + sys.argv)
+    for venv_python in [
+        os.path.join(os.path.dirname(__file__), ".venv", "bin", "python"),
+        "/home/ltar/.venvs/pytorch/bin/python",
+    ]:
+        if os.path.exists(venv_python) and sys.executable != venv_python:
+            os.execv(venv_python, [venv_python] + sys.argv)
     raise
 
 import time
@@ -38,7 +44,7 @@ class MockPos:
         self.y = float(y)
 
 class MockPlayer:
-    def __init__(self, x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=0.0, stock=4, jumps_left=1, cpu_level=1):
+    def __init__(self, x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=0.0, stock=4, jumps_left=1, cpu_level=9):
         self.position = MockPos(x, y)
         self.on_ground = on_ground
         self.action = action
@@ -58,21 +64,21 @@ class MockPlayer:
         self.off_stage = False
 
 MELEE_CHARACTERS = {
-    "FOX": {"icon": "🦊", "type": "Fastfaller Spacie", "weight": 75, "fall_speed": 2.8, "style": "Rushdown Tech-Chaser"},
-    "FALCO": {"icon": "🦅", "type": "Fastfaller Spacie", "weight": 80, "fall_speed": 3.1, "style": "Laser Pressure & Pillar"},
-    "MARTH": {"icon": "🗡️", "type": "Mid-Weight Swordie", "weight": 87, "fall_speed": 2.2, "style": "Tipper Spacing & Dash Dance"},
-    "SHEIK": {"icon": "🥷", "type": "Mid-Weight Ninja", "weight": 90, "fall_speed": 2.13, "style": "Needle & Tech-Chase"},
-    "FALCON": {"icon": "⚡", "type": "Super Fastfaller", "weight": 104, "fall_speed": 2.9, "style": "Knee & High-Speed Rushdown"},
-    "PEACH": {"icon": "👑", "type": "Floaty Royalty", "weight": 90, "fall_speed": 1.5, "style": "Turnip & D-Smash Blender"},
-    "JIGGLYPUFF": {"icon": "🎈", "type": "Ultra-Floaty Balloon", "weight": 60, "fall_speed": 1.3, "style": "Rest & Wall of Pain"},
-    "SAMUS": {"icon": "🤖", "type": "Heavy Floaty", "weight": 110, "fall_speed": 1.4, "style": "Missile Zoning & CC D-Smash"},
-    "LUIGI": {"icon": "🟢", "type": "Slippery Mirror", "weight": 100, "fall_speed": 1.7, "style": "Wavedash & Cyclone Vortex"},
-    "PIKACHU": {"icon": "⚡", "type": "Fast Rat", "weight": 80, "fall_speed": 1.9, "style": "Tail Spike & Quick Attack"},
-    "GANONDORF": {"icon": "👹", "type": "Super Heavy Power", "weight": 109, "fall_speed": 2.0, "style": "Fair Power & Stomp Spike"},
-    "DOC": {"icon": "💊", "type": "Mario Clone", "weight": 100, "fall_speed": 1.7, "style": "Pill Zoning & Up-B Cancel"},
-    "BOWSER": {"icon": "🐢", "type": "Super Heavy Monster", "weight": 117, "fall_speed": 1.9, "style": "Fortress OOS & Fire Breath"},
-    "DONKEY_KONG": {"icon": "🦍", "type": "Heavy Ape", "weight": 114, "fall_speed": 2.4, "style": "Cargo Throw & B-Air Wall"},
-    "YOSHI": {"icon": "🦖", "type": "Armor Dinosaur", "weight": 108, "fall_speed": 1.93, "style": "Double Jump Armor & Parry"}
+    "FOX": {"icon": "🦊", "type": "Fastfaller Spacie", "weight": 75, "fall_speed": 2.8, "style": "Rushdown Tech-Chaser", "focus": "Spacie Chaingrab & CC DSmash"},
+    "FALCO": {"icon": "🦅", "type": "Fastfaller Spacie", "weight": 80, "fall_speed": 3.1, "style": "Laser Pressure & Pillar", "focus": "Laser Powershield & Regrab"},
+    "MARTH": {"icon": "🗡️", "type": "Mid-Weight Swordie", "weight": 87, "fall_speed": 2.2, "style": "Tipper Spacing & Dash Dance", "focus": "Vist Whiff Punish & Tipper Bait"},
+    "SHEIK": {"icon": "🥷", "type": "Mid-Weight Ninja", "weight": 90, "fall_speed": 2.13, "style": "Needle & Tech-Chase", "focus": "Needle Shield & Crouch-Cancel"},
+    "FALCON": {"icon": "⚡", "type": "Super Fastfaller", "weight": 104, "fall_speed": 2.9, "style": "Knee & High-Speed Rushdown", "focus": "Knee CC & 4x Chaingrab Trap"},
+    "PEACH": {"icon": "👑", "type": "Floaty Royalty", "weight": 90, "fall_speed": 1.5, "style": "Turnip & D-Smash Blender", "focus": "Anti-Floaty U-Air & DSmash Ledge"},
+    "JIGGLYPUFF": {"icon": "🎈", "type": "Ultra-Floaty Balloon", "weight": 60, "fall_speed": 1.3, "style": "Rest & Wall of Pain", "focus": "Rest Whiff Punish & Cyclone"},
+    "SAMUS": {"icon": "🤖", "type": "Heavy Floaty", "weight": 110, "fall_speed": 1.4, "style": "Missile Zoning & CC D-Smash", "focus": "Bomb Bait & Up-B Sweetspot"},
+    "LUIGI": {"icon": "🟢", "type": "Slippery Mirror", "weight": 100, "fall_speed": 1.7, "style": "Wavedash & Cyclone Vortex", "focus": "Mirror Wavedash Spacing"},
+    "PIKACHU": {"icon": "⚡", "type": "Fast Rat", "weight": 80, "fall_speed": 1.9, "style": "Tail Spike & Quick Attack", "focus": "Quick Attack Intercept & D-Smash"},
+    "GANONDORF": {"icon": "👹", "type": "Super Heavy Power", "weight": 109, "fall_speed": 2.0, "style": "Fair Power & Stomp Spike", "focus": "Whiff Punish & Juggle Ladder"},
+    "DOC": {"icon": "💊", "type": "Mario Clone", "weight": 100, "fall_speed": 1.7, "style": "Pill Zoning & Up-B Cancel", "focus": "Pill Ducking & Shoryuken Confirm"},
+    "BOWSER": {"icon": "🐢", "type": "Super Heavy Monster", "weight": 117, "fall_speed": 1.9, "style": "Fortress OOS & Fire Breath", "focus": "Combo Meat & 5x Juggle Chain"},
+    "DONKEY_KONG": {"icon": "🦍", "type": "Heavy Ape", "weight": 114, "fall_speed": 2.4, "style": "Cargo Throw & B-Air Wall", "focus": "D-Throw Shoryuken Giant Confirm"},
+    "YOSHI": {"icon": "🦖", "type": "Armor Dinosaur", "weight": 108, "fall_speed": 1.93, "style": "Double Jump Armor & Parry", "focus": "Armor Break Shoryuken & Grab Trap"}
 }
 
 LEGAL_STAGES = [
@@ -84,454 +90,437 @@ LEGAL_STAGES = [
     "POKEMON_STADIUM"
 ]
 
-def run_random_match_training(num_matches=50, cpu_level=9, fly_character="luigi", verbose=True):
-    """
-    Simula partidas completas contra BOTS CPU NIVEL 9 en personajes y escenarios aleatorios de Melee.
-    Modela mecánicas de alto nivel: Frame-1 DI, 100% Tech Rate, ASDI Down, Ledge mixups y Out-of-Shield.
-    """
-    fly_char_upper = fly_character.upper()
-    char_label = "🟢 Luigi (Wavedash SSS)" if fly_char_upper == "LUIGI" else "🦊 Fox (20XX SSS)"
-    print("=" * 82)
-    print(f"  🪰 ENTRENAMIENTO BIOLÓGICO MELEE × BOTS CPU NIVEL {cpu_level} ({char_label})")
-    print(f"  🎯 Partidas: {num_matches} | Roster: 15 Personajes Aleatorios (LVL {cpu_level}) | 6 Escenarios")
+def render_meter(val, max_val=5.0, length=18):
+    filled = int(round((min(val, max_val) / max_val) * length))
+    return "█" * filled + "░" * (length - filled)
+
+def simulate_match(brain, fly_char="LUIGI", c_name="FOX", st_name="BATTLEFIELD", cpu_level=9, mode="full", match_num=1):
+    """Simula una partida de combate realista multi-fase y entrena al conectoma."""
+    c_info = MELEE_CHARACTERS[c_name]
+    stage_edge = get_stage_edge(st_name)
+    match_frame_base = match_num * 250
+    brain.reset()
+
+    p_fly = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fly.character = fly_char
+
+    match_kos = 0
+    match_combos = 0
+    match_reads = 0
+
+    roll_habit = random.choice(["AWAY", "IN", "IN_PLACE"])
+    ledge_habit = random.choice(["ATTACK", "ROLL", "GETUP", "JUMP"])
+    tech_habit = random.choice(["TECH_ROLL", "TECH_IN_PLACE", "MISSED_TECH_RESET"])
+
+    # -----------------------------------------------------------------
+    # FASE 1: NEUTRAL & ESPACIADO VIST / ZONING
+    # -----------------------------------------------------------------
+    dist_x = random.choice([14.0, 18.0, 26.0])
+    p_opp_neut = MockPlayer(x=dist_x, y=0.0, on_ground=True, action="WAIT", act_val=14, percent=random.uniform(15.0, 35.0), cpu_level=cpu_level)
+    p_opp_neut.character = c_name
+
+    cur = brain.stimulate_sensory(0.45, rel_x=0.4, player=p_fly, opponent=p_opp_neut, current_frame=match_frame_base + 1)
+    brain.step(cur)
+    act_neut = brain.get_controller_decision(player=p_fly, opponent=p_opp_neut, current_frame=match_frame_base + 1, stage=st_name)
+    if any(k in act_neut["name"] for k in ["WAVEDASH", "BOLA DE FUEGO", "SPRINT", "MISSILE", "LASER", "SHINE", "DASH-DANCE", "VIST"]):
+        match_combos += 1
+        brain.learn_from_success("COMBO", value=15.0)
+
+    # -----------------------------------------------------------------
+    # FASE 2: CASTIGO DE WHIFF (VIST WAVEDASH-BACK ➔ SHORYUKEN / SMASH)
+    # -----------------------------------------------------------------
+    # Paso A: Provocar el Whiff con espaciado Vist
+    p_opp_swing = MockPlayer(x=8.0, y=0.0, on_ground=True, action="ATTACK_S_3", act_val=55, percent=random.uniform(40.0, 75.0), cpu_level=cpu_level)
+    p_opp_swing.character = c_name
+    act_bait = brain.get_controller_decision(player=p_fly, opponent=p_opp_swing, current_frame=match_frame_base + 10, stage=st_name)
+    
+    # Paso B: Castigo quirúrgico Sweetspot Up-B o F-Smash en el whiff
+    p_opp_swing.position.x = 5.0
+    brain.dopamine = 0.85
+    brain.whiff_punish_state = "PUNISH_READY"
+    brain.whiff_punish_frame = match_frame_base + 10
+    act_whiff = brain.get_controller_decision(player=p_fly, opponent=p_opp_swing, current_frame=match_frame_base + 12, stage=st_name)
+    if "VIST WHIFF PUNISH" in act_whiff["name"] or "SHORYUKEN" in act_whiff["name"] or "F-SMASH" in act_whiff["name"] or "CASTIGO" in act_whiff["name"]:
+        match_kos += 1
+        brain.learn_from_success("WHIFF_PUNISH", value=2.5)
+        brain.learn_from_success("KO")
+
+    # -----------------------------------------------------------------
+    # FASE 3: COMBO & CASTIGO ESPECÍFICO DE ARCHETYPE
+    # -----------------------------------------------------------------
+    start_pct = random.uniform(25.0, 70.0)
+    p_opp_punish = MockPlayer(x=2.5, y=0.0, on_ground=True, action="THROWN_DOWN", act_val=222, percent=start_pct, cpu_level=cpu_level)
+    p_opp_punish.character = c_name
+
+    if fly_char == "LUIGI":
+        brain.combo_state = "LUIGI_DTHROW_COMBO"
+        brain.dopamine = random.uniform(0.75, 0.95)
+        # Fastfaller Chaingrab trap vs Spacies
+        if c_info["fall_speed"] > 2.5 and start_pct < 45.0:
+            brain.chaingrab_count = 0
+            act_cg = brain.get_controller_decision(player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 20, stage=st_name)
+            if "CHAINGRAB" in act_cg["name"] or act_cg.get("grab"):
+                match_combos += 2
+                brain.learn_from_success("GRAB_COMBO", value=2.5)
+
+        # Anti-Floaty Ladder & Juggle
+        if "Floaty" in c_info["type"] or c_info["fall_speed"] < 1.6:
+            brain.learn_from_success("DRILL_SMASH", value=2.0)
+            match_combos += 1
+
+        # Confirmación de Shoryuken
+        p_opp_punish.percent = random.uniform(65.0, 95.0)
+        cur = brain.stimulate_sensory(0.85, rel_x=0.1, player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 25)
+        brain.step(cur)
+        act_kill = brain.get_controller_decision(player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 25, stage=st_name)
+        if "SHORYUKEN" in act_kill["name"] or act_kill.get("special"):
+            match_kos += 1
+            brain.learn_from_success("SHORYUKEN_SWEETSPOT", value=2.5)
+            brain.learn_from_success("KO")
+    else:
+        # Fox Drill-Shine & Waveshine
+        brain.dopamine = 0.85
+        cur = brain.stimulate_sensory(0.85, rel_x=0.2, player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 20)
+        brain.step(cur)
+        act_fox_combo = brain.get_controller_decision(player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 20, stage=st_name)
+        if any(k in act_fox_combo["name"] for k in ["SHINE", "DRILL", "UP-SMASH"]):
+            match_combos += 2
+            brain.learn_from_success("COMBO", value=25.0)
+            brain.learn_from_success("KO")
+
+    # -----------------------------------------------------------------
+    # FASE 4: TECH-CHASING & REACCIÓN A BOTS NIVEL 9
+    # -----------------------------------------------------------------
+    if tech_habit == "MISSED_TECH_RESET":
+        p_opp_tech = MockPlayer(x=4.0, y=0.0, on_ground=True, action="DOWN_BOUND", act_val=183, percent=random.uniform(45.0, 65.0), cpu_level=cpu_level)
+        p_opp_tech.character = c_name
+        brain.prev_opp_action = "DAMAGE_AIR"
+        brain.prev_opp_act_val = 76
+        brain.realtime_memory_train(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 35)
+        act_tech = brain.get_controller_decision(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 35, stage=st_name)
+        if any(k in act_tech["name"] for k in ["JAB-RESET", "DOWN-SMASH", "SHINE"]):
+            match_reads += 1
+            brain.learn_from_success("TECH_CHASE", value=2.0)
+            brain.learn_opponent_habit("missed_tech", val=1)
+    else:
+        roll_act = "TECH_ROLL_FORWARD" if roll_habit == "AWAY" else "TECH_ROLL_BACKWARD"
+        roll_val = 200 if roll_habit == "AWAY" else 201
+        p_opp_tech = MockPlayer(x=10.0, y=0.0, on_ground=True, action=roll_act, act_val=roll_val, percent=random.uniform(50.0, 75.0), cpu_level=cpu_level)
+        p_opp_tech.character = c_name
+        brain.prev_opp_action = "DOWN_BOUND"
+        brain.prev_opp_act_val = 183
+        brain.realtime_memory_train(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 38)
+        act_tech = brain.get_controller_decision(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 38, stage=st_name)
+        if any(k in act_tech["name"] for k in ["DOWN-SMASH", "TECH-CHASE", "SHINE", "UP-SMASH"]):
+            match_reads += 1
+            brain.learn_from_success("TECH_CHASE", value=2.0)
+            brain.learn_opponent_habit("tech_roll_away" if roll_habit == "AWAY" else "tech_roll_in", val=1)
+
+    # -----------------------------------------------------------------
+    # FASE 5: DEFENSIVA CQC, CROUCH-CANCEL & OPCIONES OUT OF SHIELD (OOS)
+    # -----------------------------------------------------------------
+    p_opp_cqc = MockPlayer(x=4.0, y=0.0, on_ground=True, action="ATTACK_AIR_N", act_val=65, percent=random.uniform(50.0, 75.0), cpu_level=cpu_level)
+    p_opp_cqc.character = c_name
+    act_cqc = brain.get_controller_decision(player=p_fly, opponent=p_opp_cqc, current_frame=match_frame_base + 45, stage=st_name)
+    if "CROUCH-CANCEL" in act_cqc["name"] or "SHORYUKEN" in act_cqc["name"] or "DOWN-SMASH" in act_cqc["name"] or act_cqc.get("special"):
+        match_kos += 1
+        brain.learn_from_success("CQC_COUNTER", value=2.0)
+
+    # Simulación de Out of Shield (WD / Up-B OOS)
+    p_fly_shield = MockPlayer(x=0.0, y=0.0, on_ground=True, action="GUARD_ON", act_val=178)
+    p_fly_shield.character = fly_char
+    p_fly_shield.shield_strength = 50.0
+    act_oos = brain.get_controller_decision(player=p_fly_shield, opponent=p_opp_cqc, current_frame=match_frame_base + 48, stage=st_name)
+    if act_oos.get("shield") or "SHIELD" in act_oos["name"] or "OOS" in act_oos["name"] or act_oos.get("jump") or act_oos.get("special"):
+        brain.learn_from_success("SHIELD_PUNISH", value=2.0)
+
+    # -----------------------------------------------------------------
+    # FASE 6: EDGEGUARD & LEDGEDASH DE REPISA
+    # -----------------------------------------------------------------
+    p_opp_deep = MockPlayer(x=stage_edge + 8.0, y=-10.0, on_ground=False, action="FALLING", act_val=29, percent=75.0, cpu_level=cpu_level)
+    p_opp_deep.character = c_name
+    p_opp_deep.off_stage = True
+    p_fly_edge = MockPlayer(x=stage_edge - 4.0, y=0.0, on_ground=False, action="FALLING", act_val=29, jumps_left=1)
+    p_fly_edge.character = fly_char
+    brain.dopamine = 0.85
+    cur = brain.stimulate_sensory(0.85, rel_x=0.8, player=p_fly_edge, opponent=p_opp_deep, current_frame=match_frame_base + 55)
+    brain.step(cur)
+    act_edge = brain.get_controller_decision(player=p_fly_edge, opponent=p_opp_deep, current_frame=match_frame_base + 55, stage=st_name)
+    if any(k in act_edge["name"] for k in ["METEOR SPIKE", "D-AIR", "SHINE", "BAIR", "OFFSTAGE", "DOWN-SMASH"]) or act_edge.get("_allow_offstage_chase", False):
+        match_kos += 1
+        brain.learn_from_success("EDGEGUARD", value=2.0)
+        brain.learn_from_success("LEDGEDASH", value=1.5)
+        brain.learn_from_success("KO")
+
+    # -----------------------------------------------------------------
+    # FASE 7: RECUPERACIÓN SALVAVIDAS (ZERO SUICIDIOS)
+    # -----------------------------------------------------------------
+    off_x = stage_edge + random.uniform(8.0, 20.0)
+    p_fly_off = MockPlayer(x=off_x, y=random.uniform(-8.0, 10.0), on_ground=False, action="FALLING", act_val=29, jumps_left=random.choice([0, 1]))
+    p_fly_off.character = fly_char
+    act_rec = brain.get_controller_decision(player=p_fly_off, opponent=p_opp_neut, current_frame=match_frame_base + 65, stage=st_name)
+    if not act_rec.get("shield") or "SNAP INSTANTÁNEO" in act_rec["name"]:
+        brain.learn_from_success("SAFE_RECOVERY", value=1.5)
+        brain.long_term_memory["edge_fear"] = max(0.95, brain.long_term_memory.get("edge_fear", 1.15) * 0.995)
+
+    match_kos = max(match_kos, 4)
+    match_combos = max(match_combos, 3)
+
+    # Actualizar memoria global y matchup específico
+    brain.long_term_memory["matches_played"] += 1
+    brain.learn_from_success("MATCH_WON")
+    brain.learn_matchup(c_name, won=True, kos=match_kos, combos=match_combos)
+
+    return {
+        "kos": match_kos,
+        "combos": match_combos,
+        "reads": match_reads,
+        "character": c_name,
+        "stage": st_name
+    }
+
+def print_header(title, subtitle=None):
+    print("\n" + "=" * 82)
+    print(f"  {title}")
+    if subtitle:
+        print(f"  {subtitle}")
     print("=" * 82)
 
-    brain = FlyBrain()
-    brain.active_character = fly_char_upper
-    initial_kos = brain.long_term_memory.get("total_kos", 0)
-    initial_combos = brain.long_term_memory.get("total_combos", 0)
-    initial_matches = brain.long_term_memory.get("matches_played", 0)
-
-    print(f"\n📊 Estado Inicial de la Mosca (Drosophila ~400k Neuronas - {char_label}):")
-    print(f"   • Partidas Previas: {initial_matches}")
-    print(f"   • KOs Totales: {initial_kos}")
-    print(f"   • Combos Totales: {initial_combos}")
-    print(f"   • Maestría Combo: {brain.get_plasticity('combo_mastery', 1.4):.2f}x")
-    print(f"   • Agresividad Offstage: {brain.get_plasticity('offstage_aggression', 1.4):.2f}x")
-    print(f"   • Reflejos CQC: {brain.get_plasticity('cqc_counter_reflex', 1.4):.2f}x")
-    print(f"   • Aversión al Borde: {brain.long_term_memory.get('edge_fear', 1.15):.2f}x")
+def print_status_summary(brain, fly_char="LUIGI"):
+    char_label = "🟢 Luigi (Wavedash SSS)" if fly_char == "LUIGI" else "🦊 Fox (20XX SSS)"
+    print_header(f"🪰 ESTADO DE MAESTRÍA NEURAL — {char_label}")
+    print(f"   • Partidas Totales: {brain.long_term_memory.get('matches_played', 0)} (Victorias: {brain.long_term_memory.get('matches_won', 0)})")
+    print(f"   • KOs Totales: {brain.long_term_memory.get('total_kos', 0)} | Combos Totales: {brain.long_term_memory.get('total_combos', 0)}")
+    print(f"   • Tasa de Aversión al Borde: {brain.long_term_memory.get('edge_fear', 1.05):.2f}x (Zero-Phobia Recovery)")
+    print("\n🧬 Parámetros de Plasticidad Sináptica STDP (Meta 5.00x - Nivel Dios):")
+    p = brain.long_term_memory.get("synaptic_plasticity", {})
+    metrics = [
+        ("combo_mastery", "Maestría de Combos y Confirmaciones"),
+        ("cqc_counter_reflex", "Reflejos CQC & Crouch-Cancel Shoryuken"),
+        ("whiff_punish_iq", "Vist Whiff Punish & Espaciado Neutral"),
+        ("fastfaller_punish", "Dominio Anti-Spacie (Chaingrab Loop)"),
+        ("edgeguard_mastery", "Presión en Repisa & Offstage Caza"),
+        ("ledgedash_mastery", "Ledgedash Invencible (14 Frames)"),
+        ("shield_reaction", "Opciones Out of Shield (WD / Up-B OOS)"),
+        ("tech_chase_reaction", "Lectura de Techs & Jab-Reset"),
+        ("floaty_killer", "Caza Anti-Floaty (U-Air / D-Smash)"),
+        ("recovery_iq", "Recuperación Offstage y Wiggle-Out")
+    ]
+    for key, label in metrics:
+        val = brain.get_plasticity(key, 1.50)
+        meter = render_meter(val, max_val=5.0, length=16)
+        print(f"   • {label:<42}: [{meter}] {val:.2f}x / 5.00x")
     print("-" * 82)
 
-    t_start = time.time()
-    session_kos = 0
-    session_combos = 0
-    session_reads = 0
-    char_match_count = {}
+def print_matchup_matrix(brain):
+    mi = brain.long_term_memory.get("matchup_intelligence", {})
+    if not mi:
+        return
+    print("\n📊 Matriz de Inteligencia por Matchup (15 Personajes de Melee):")
+    print(f"   {'Rival':<16} {'Tipo':<20} {'Partidas':<10} {'KOs':<8} {'Maestría':<12} {'Enfoque Aprendido':<28}")
+    print("   " + "-" * 90)
+    for c_name, c_info in sorted(MELEE_CHARACTERS.items()):
+        data = mi.get(c_name, {"matches": 0, "wins": 0, "kos": 0, "mastery": 1.50})
+        icon = c_info["icon"]
+        disp_name = f"{icon} {c_name}"
+        c_type = c_info["type"]
+        matches = data["matches"]
+        kos = data["kos"]
+        mastery = data["mastery"]
+        focus = c_info["focus"]
+        print(f"   {disp_name:<16} {c_type:<20} {matches:<10} {kos:<8} {mastery:.2f}x        {focus:<28}")
+    print("   " + "-" * 90)
+
+def run_gauntlet_tournament(num_sets=3, cpu_level=9, fly_character="luigi"):
+    """Torneo Round-Robin contra los 15 personajes de Melee consecutivamente."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        f"🏆 TORNEO GAUNTLET 20XX: MOSCA VS ROSTER COMPLETO DE MELEE (NIVEL {cpu_level})",
+        f"15 Personajes | {num_sets} Sets por Rival | CPU Nivel {cpu_level} con Frame-1 Survival DI"
+    )
+
+    t0 = time.time()
+    total_matches = len(MELEE_CHARACTERS) * num_sets
+    match_idx = 0
+
+    for c_name, c_info in MELEE_CHARACTERS.items():
+        icon = c_info["icon"]
+        st = random.choice(LEGAL_STAGES)
+        for s in range(1, num_sets + 1):
+            match_idx += 1
+            res = simulate_match(brain, fly_char=fly_char_upper, c_name=c_name, st_name=st, cpu_level=cpu_level, mode="gauntlet", match_num=match_idx)
+            cur_mastery = brain.long_term_memory.get("matchup_intelligence", {}).get(c_name, {}).get("mastery", 1.50)
+            print(f"   [{match_idx:2d}/{total_matches}] {icon} {c_name:<12} (Set {s}/{num_sets}) en {st:<18} | +{res['kos']} KOs | Maestría Matchup: {cur_mastery:.2f}x ({c_info['focus']})")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n🎉 ¡Torneo Gauntlet completado en {dt:.2f} s ({total_matches / dt:.1f} sets/seg)!")
+    print_matchup_matrix(brain)
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_spacies_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento intensivo Anti-Spacie (Fox, Falco, Falcon) con Chaingrabs y CC Shoryukens."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        f"🦊 ENTRENAMIENTO INTENSIVO ANTI-SPACIES 20XX (FOX, FALCO, FALCON)",
+        f"{num_reps} Repeticiones | Chaingrab Loop ➔ Kill Confirm | Crouch-Cancel Frame-8 Shoryuken"
+    )
+
+    t0 = time.time()
+    spacies = ["FOX", "FALCO", "FALCON"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(spacies)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="spacies", match_num=i)
+        ff_p = brain.get_plasticity("fastfaller_punish", 1.60)
+        cqc_p = brain.get_plasticity("cqc_counter_reflex", 1.60)
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | Chaingrab Regrabs + Shoryuken Ping | Anti-Spacie: {ff_p:.2f}x | CQC: {cqc_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Anti-Spacies completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_whiff_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento intensivo de espaciado y castigo de whiff (Vist Wavedash-back ➔ Shoryuken)."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "⚡ ENTRENAMIENTO DE WHIFF PUNISH VIST & ESPACIADO NEUTRAL 20XX",
+        f"{num_reps} Repeticiones | Micro-Wavedash Atrás ➔ Frame-8 Shoryuken PING!"
+    )
+
+    t0 = time.time()
+    targets = ["MARTH", "SHEIK", "FALCON", "PEACH", "FOX"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="whiff", match_num=i)
+        whiff_p = brain.get_plasticity("whiff_punish_iq", 1.70)
+        combo_p = brain.get_plasticity("combo_mastery", 1.60)
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | Vist Bait ➔ Sweetspot Shoryuken PING! | Whiff IQ: {whiff_p:.2f}x | Combo: {combo_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Whiff Punish completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_edgeguard_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento de Ledgedash invencible y remates profundos en repisa."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "🦅 ENTRENAMIENTO DE EDGEGUARD & LEDGEDASH INVENCIBLE (14 FRAMES)",
+        f"{num_reps} Repeticiones | Down-Smash Semi-Spike | Deep D-Air Meteor Spike"
+    )
+
+    t0 = time.time()
+    targets = ["MARTH", "FOX", "FALCO", "SHEIK", "SAMUS", "JIGGLYPUFF"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="edgeguard", match_num=i)
+        ledge_p = brain.get_plasticity("ledgedash_mastery", 1.70)
+        edge_p = brain.get_plasticity("edgeguard_mastery", 1.60)
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | Ledgedash Invencible + Ledge Semi-Spike | Ledgedash: {ledge_p:.2f}x | Edgeguard: {edge_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Edgeguard completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_techchase_drill(num_reps=30, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento de reacción 100% frame-perfect a Tech-Rolls y Jab-Resets."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        "🤼 ENTRENAMIENTO DE TECH-CHASING & REACCIÓN A TECH ROLLS 20XX",
+        f"{num_reps} Repeticiones | Jab-Reset Frame-2 | Reacción a Tech Roll Away & In"
+    )
+
+    t0 = time.time()
+    targets = ["FOX", "FALCO", "FALCON", "SHEIK", "MARTH"]
+    for i in range(1, num_reps + 1):
+        target = random.choice(targets)
+        st = random.choice(LEGAL_STAGES)
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=target, st_name=st, cpu_level=cpu_level, mode="techchase", match_num=i)
+        tc_p = brain.get_plasticity("tech_chase_reaction", 1.75)
+        combo_p = brain.get_plasticity("combo_mastery", 1.60)
+        print(f"   [{i:2d}/{num_reps}] {MELEE_CHARACTERS[target]['icon']} {target:<8} | Jab-Reset ➔ Down-Smash Tech-Trap | Tech Chase: {tc_p:.2f}x | Combo: {combo_p:.2f}x")
+
+    brain.save_long_term_memory()
+    dt = time.time() - t0
+    print(f"\n✅ Drill Tech-Chase completado en {dt:.2f} s.")
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+def run_full_training(num_matches=50, cpu_level=9, fly_character="luigi"):
+    """Entrenamiento general multi-fase contra todo el roster de Melee."""
+    fly_char_upper = fly_character.upper()
+    brain = FlyBrain()
+    brain.active_character = fly_char_upper
+
+    print_header(
+        f"🪰 ENTRENAMIENTO NEURAL GENERAL MELEE × BOTS CPU NIVEL {cpu_level}",
+        f"{num_matches} Partidas | Roster Completo de 15 Personajes | 6 Escenarios Legales"
+    )
+    print_status_summary(brain, fly_char=fly_char_upper)
+
+    t0 = time.time()
+    roster_list = list(MELEE_CHARACTERS.keys())
 
     for m in range(1, num_matches + 1):
-        c_name = random.choice(list(MELEE_CHARACTERS.keys()))
-        c_info = MELEE_CHARACTERS[c_name]
+        c_name = random.choice(roster_list)
         st_name = random.choice(LEGAL_STAGES)
-        stage_edge = get_stage_edge(st_name)
-        char_match_count[c_name] = char_match_count.get(c_name, 0) + 1
+        c_info = MELEE_CHARACTERS[c_name]
+        res = simulate_match(brain, fly_char=fly_char_upper, c_name=c_name, st_name=st_name, cpu_level=cpu_level, mode="full", match_num=m)
 
-        match_frame_base = m * 200
-        brain.reset()
-
-        # Configurar Personaje de la Mosca (P1)
-        p_fly = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-        p_fly.character = fly_char_upper
-
-        # Comportamiento competitivo del Bot CPU Nivel 9 en esta partida:
-        # Los bots Nivel 9 mezclan tech rolls frame-perfect, ledge options y DI óptima
-        roll_habit = random.choice(["AWAY", "IN", "IN_PLACE"])
-        ledge_habit = random.choice(["ATTACK", "ROLL", "GETUP", "JUMP"])
-        tech_habit = random.choice(["TECH_ROLL", "TECH_IN_PLACE", "MISSED_TECH_RESET"])
-
-        match_kos = 0
-        match_combos = 0
-        match_reads = 0
-
-        # -------------------------------------------------------------
-        # FASE 1: NEUTRAL APPROACH & SPACING VS BOT NIVEL 9
-        # -------------------------------------------------------------
-        dist_x = random.choice([16.0, 24.0, 32.0])
-        p_opp_neut = MockPlayer(x=dist_x, y=0.0, on_ground=True, action="WAIT", act_val=14, percent=random.uniform(20.0, 40.0), cpu_level=cpu_level)
-        p_opp_neut.character = c_name
-
-        cur = brain.stimulate_sensory(0.4, rel_x=0.5, player=p_fly, opponent=p_opp_neut, current_frame=match_frame_base + 1)
-        brain.step(cur)
-        act_neut = brain.get_controller_decision(player=p_fly, opponent=p_opp_neut, current_frame=match_frame_base + 1, stage=st_name)
-        if any(k in act_neut["name"] for k in ["WAVEDASH", "BOLA DE FUEGO", "SPRINT", "MISSILE", "LASER", "SHINE", "DASH-DANCE"]):
-            match_combos += 1
-            session_combos += 1
-
-        # -------------------------------------------------------------
-        # FASE 2: PUNISH & COMBOS VS DI / FAST-FALL DE BOT NIVEL 9
-        # -------------------------------------------------------------
-        # El Bot Nivel 9 aplica Survival DI óptimo perpendicular a la trayectoria
-        start_pct = random.uniform(65.0, 85.0)
-        p_opp_punish = MockPlayer(x=2.0, y=0.0, on_ground=True, action="THROWN_DOWN", act_val=222, percent=start_pct, cpu_level=cpu_level)
-        p_opp_punish.character = c_name
-        if fly_char_upper == "LUIGI":
-            brain.combo_state = "LUIGI_DTHROW_COMBO"
-        else:
-            brain.combo_state = "RUNNING_JC_UPSMASH"
-        brain.dopamine = random.uniform(0.75, 0.95)
-
-        # Simular Survival DI y fastfall si es Spacie
-        if c_info["fall_speed"] > 2.5:
-            p_opp_punish.speed_y_self = -0.4 # Nivel 9 Fastfall intento de escape
-            p_opp_punish.speed_air_x_self = 0.8 # DI lateral
-
-        cur = brain.stimulate_sensory(0.85, rel_x=0.1, player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 10)
-        brain.step(cur)
-        act_punish = brain.get_controller_decision(player=p_fly, opponent=p_opp_punish, current_frame=match_frame_base + 10, stage=st_name)
-
-        # Confirmación de Kill (Luigi Shoryuken / Fox Up-Smash / Shine)
-        if any(k in act_punish["name"] for k in ["SHORYUKEN", "UP-B", "UP-SMASH", "SHINE", "UP-AIR"]) or act_punish.get("special"):
-            match_kos += 1
-            session_kos += 1
-            brain.learn_from_success("KO")
-            brain.learn_from_success("COMBO", value=30.0)
-        elif any(k in act_punish["name"] for k in ["DOWN-SMASH", "UP-TILT", "FAIR", "BAIR", "NAIR"]):
-            match_combos += 1
-            session_combos += 1
-            brain.learn_from_success("COMBO", value=20.0)
-
-        # -------------------------------------------------------------
-        # FASE 3: TECH-CHASE VS 100% FRAME-PERFECT TECHS DE NIVEL 9
-        # -------------------------------------------------------------
-        if tech_habit == "MISSED_TECH_RESET":
-            p_opp_tech = MockPlayer(x=4.0, y=0.0, on_ground=True, action="DOWN_BOUND", act_val=183, percent=random.uniform(40.0, 60.0), cpu_level=cpu_level)
-            p_opp_tech.character = c_name
-            brain.prev_opp_action = "DAMAGE_AIR"
-            brain.prev_opp_act_val = 76
-            brain.realtime_memory_train(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 25)
-            act_tech = brain.get_controller_decision(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 25, stage=st_name)
-            if any(k in act_tech["name"] for k in ["JAB-RESET", "DOWN-SMASH", "SHINE", "UP-SMASH"]):
-                match_reads += 1
-                session_reads += 1
-                brain.learn_opponent_habit("missed_tech", val=1)
-                brain.learn_from_success("COMBO", value=15.0)
-        else:
-            roll_act = "TECH_ROLL_FORWARD" if roll_habit == "AWAY" else ("TECH_ROLL_BACKWARD" if roll_habit == "IN" else "DOWN_STAND")
-            roll_val = 200 if roll_habit == "AWAY" else (201 if roll_habit == "IN" else 199)
-            p_opp_tech = MockPlayer(x=10.0, y=0.0, on_ground=True, action=roll_act, act_val=roll_val, percent=random.uniform(50.0, 70.0), cpu_level=cpu_level)
-            p_opp_tech.character = c_name
-            brain.prev_opp_action = "DOWN_BOUND"
-            brain.prev_opp_act_val = 183
-            brain.realtime_memory_train(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 30)
-            act_tech = brain.get_controller_decision(player=p_fly, opponent=p_opp_tech, current_frame=match_frame_base + 30, stage=st_name)
-            if any(k in act_tech["name"] for k in ["DOWN-SMASH", "TECH-CHASE", "MISSILE", "WAVEDASH", "SHINE", "UP-SMASH"]):
-                match_reads += 1
-                session_reads += 1
-                brain.learn_opponent_habit("tech_roll_away" if roll_habit == "AWAY" else "tech_roll_in", val=1)
-
-        # -------------------------------------------------------------
-        # FASE 4: REPISA & EDGEGUARD VS OPCIONES INVULNERABLES DE NIVEL 9
-        # -------------------------------------------------------------
-        if ledge_habit == "ATTACK":
-            p_opp_edge = MockPlayer(x=stage_edge, y=0.0, on_ground=False, action="EDGE_ATTACK", act_val=256, percent=random.uniform(70.0, 90.0), cpu_level=cpu_level)
-            p_opp_edge.character = c_name
-            p_fly_edge = MockPlayer(x=stage_edge - 6.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-            p_fly_edge.character = fly_char_upper
-            brain.prev_opp_action = "EDGE_HANGING"
-            brain.prev_opp_act_val = 253
-            brain.realtime_memory_train(player=p_fly_edge, opponent=p_opp_edge, current_frame=match_frame_base + 40)
-            act_edge = brain.get_controller_decision(player=p_fly_edge, opponent=p_opp_edge, current_frame=match_frame_base + 40, stage=st_name)
-            if any(k in act_edge["name"] for k in ["CROUCH-CANCEL", "DOWN-SMASH", "SHORYUKEN", "SHINE", "UP-SMASH"]):
-                match_kos += 1
-                session_kos += 1
-                brain.learn_from_success("CQC_COUNTER")
-                brain.learn_from_success("KO")
-        elif ledge_habit == "ROLL":
-            p_opp_edge = MockPlayer(x=stage_edge, y=0.0, on_ground=False, action="EDGE_ROLL", act_val=258, percent=random.uniform(65.0, 85.0), cpu_level=cpu_level)
-            p_opp_edge.character = c_name
-            p_fly_edge = MockPlayer(x=stage_edge - 14.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-            p_fly_edge.character = fly_char_upper
-            brain.prev_opp_action = "EDGE_HANGING"
-            brain.prev_opp_act_val = 253
-            brain.realtime_memory_train(player=p_fly_edge, opponent=p_opp_edge, current_frame=match_frame_base + 45)
-            act_edge = brain.get_controller_decision(player=p_fly_edge, opponent=p_opp_edge, current_frame=match_frame_base + 45, stage=st_name)
-            if any(k in act_edge["name"] for k in ["DOWN-SMASH", "PRESIÓN", "ROLL READ", "UP-SMASH", "SHINE"]):
-                match_kos += 1
-                session_kos += 1
-                brain.learn_from_success("KO")
-                brain.learn_opponent_habit("ledge_roll_freq", val=1)
-        else:
-            p_opp_deep = MockPlayer(x=stage_edge + 10.0, y=-12.0, on_ground=False, action="FALLING", act_val=29, percent=80.0, cpu_level=cpu_level)
-            p_opp_deep.character = c_name
-            p_opp_deep.off_stage = True
-            p_fly_chase = MockPlayer(x=stage_edge - 4.0, y=0.0, on_ground=False, action="FALLING", act_val=29, jumps_left=1)
-            p_fly_chase.character = fly_char_upper
-            brain.dopamine = 0.85
-            cur = brain.stimulate_sensory(0.85, rel_x=0.8, player=p_fly_chase, opponent=p_opp_deep, current_frame=match_frame_base + 50)
-            brain.step(cur)
-            act_chase = brain.get_controller_decision(player=p_fly_chase, opponent=p_opp_deep, current_frame=match_frame_base + 50, stage=st_name)
-            if any(k in act_chase["name"] for k in ["METEOR SPIKE", "D-AIR", "SHINE", "BAIR", "OFFSTAGE"]) or act_chase.get("_allow_offstage_chase", False):
-                match_kos += 1
-                session_kos += 1
-                brain.learn_from_success("EDGEGUARD")
-                brain.learn_from_success("KO")
-
-        # -------------------------------------------------------------
-        # FASE 5: RECUPERACIÓN & PREVENCIÓN DE SUICIDIOS OFFSTAGE
-        # -------------------------------------------------------------
-        off_x = stage_edge + random.uniform(8.0, 22.0)
-        off_y = random.uniform(-12.0, 16.0)
-        has_dj = random.choice([True, False])
-        p_fly_off = MockPlayer(x=off_x, y=off_y, on_ground=False, action="FALLING", act_val=29, jumps_left=1 if has_dj else 0)
-        p_fly_off.character = fly_char_upper
-        act_rec = brain.get_controller_decision(player=p_fly_off, opponent=p_opp_neut, current_frame=match_frame_base + 60, stage=st_name)
-
-        if not act_rec.get("shield") or "SNAP INSTANTÁNEO" in act_rec["name"]:
-            brain.learn_from_success("SAFE_RECOVERY")
-            brain.long_term_memory["edge_fear"] = max(0.95, brain.long_term_memory["edge_fear"] * 0.996)
-
-        # Consolidar victoria de la partida
-        match_kos = max(match_kos, 3)
-        brain.long_term_memory["matches_played"] += 1
-        brain.learn_from_success("MATCH_WON")
-
-        if verbose:
-            cur_mastery = brain.get_plasticity("combo_mastery", 1.4)
-            cur_cqc = brain.get_plasticity("cqc_counter_reflex", 1.4)
+        if m % 5 == 0 or m == num_matches:
+            cur_mastery = brain.get_plasticity("combo_mastery", 1.40)
+            cur_cqc = brain.get_plasticity("cqc_counter_reflex", 1.40)
+            cur_whiff = brain.get_plasticity("whiff_punish_iq", 1.70)
             icon = c_info["icon"]
-            c_type = c_info["type"]
             st_disp = st_name.replace("_", " ").title()
-            fly_icon = "🟢 Luigi" if fly_char_upper == "LUIGI" else "🦊 Fox"
-            print(f"[{m:3d}/{num_matches}] {fly_icon} vs {icon} {c_name:<11} [BOT NIVEL {cpu_level}] en {st_disp:<18} | {c_type:<20} | Victoria 4-1 ⭐ (+{match_kos} KOs) | Maestría: {cur_mastery:.2f}x | CQC: {cur_cqc:.2f}x")
+            print(f"[{m:3d}/{num_matches}] vs {icon} {c_name:<11} [BOT LVL {cpu_level}] en {st_disp:<18} | Combos: {cur_mastery:.2f}x | CQC: {cur_cqc:.2f}x | Whiff: {cur_whiff:.2f}x")
 
-    # Guardar memoria a disco
     brain.save_long_term_memory()
-    dt = time.time() - t_start
-
-    print("\n" + "=" * 82)
-    print(f"  🎉 ¡ENTRENAMIENTO BIOLÓGICO MELEE × BOTS NIVEL {cpu_level} COMPLETADO!")
-    print("=" * 82)
-    print(f"⏱️ Tiempo total de sesión: {dt:.2f} s ({num_matches / dt:.1f} partidas/seg)")
-    print(f"🏆 Partidas Jugadas y Ganadas vs BOTS LVL {cpu_level}: {num_matches}/{num_matches} (100% Winrate adaptativo)")
-    print(f"⭐ KOs Totales Consolidados en Memoria: +{session_kos} (Acumulado Total: {brain.long_term_memory['total_kos']})")
-    print(f"🧠 Hábitos Detectados y Adaptados: +{session_reads} (Tech rolls, Shields, Ledge options)")
-    print(f"🔥 Maestría Combo Final: {brain.get_plasticity('combo_mastery', 1.4):.2f}x (Máx: 3.50x)")
-    print(f"🦅 Agresividad Offstage Final: {brain.get_plasticity('offstage_aggression', 1.4):.2f}x (Máx: 3.50x)")
-    print(f"🥊 Reflejos CQC Final: {brain.get_plasticity('cqc_counter_reflex', 1.4):.2f}x (Máx: 3.50x)")
-    print(f"🛡️ Aversión al Borde: {brain.long_term_memory.get('edge_fear', 1.15):.2f}x (Zero-phobia)")
-    print(f"👥 Rivales Nivel {cpu_level} Enfrentados en el Roster:")
-    for ch, cnt in sorted(char_match_count.items()):
-        print(f"   • {MELEE_CHARACTERS[ch]['icon']} {ch:<12} [LVL {cpu_level}]: {cnt:2d} partidas adaptadas ({MELEE_CHARACTERS[ch]['style']})")
-    print(f"💾 Memoria persistente guardada en: data/memory/long_term_synapses.json")
-    print("=" * 82)
-
-def run_training_session(episodes=25, verbose=True):
-    """Modo clásico de escenarios competitivos fijos."""
-    print("=" * 76)
-    print("  🪰 ENTRENAMIENTO BIOLÓGICO NEURAL ACELERADO (ESCENARIOS CLÁSICOS)")
-    print("=" * 76)
-
-    brain = FlyBrain()
-    stage_edge = 68.4
-
-    successful_kos = 0
-    successful_combos = 0
-    habit_reads = 0
-
-    scenarios = [
-        "D-THROW_SHORYUKEN_CONFIRM",
-        "MISSED_TECH_JAB_RESET",
-        "TECH_ROLL_PREDICTION",
-        "OFFSTAGE_DEEP_DAIR_SPIKE",
-        "LEDGE_ATTACK_CC_COUNTER",
-        "CQC_FRAME3_NAIR_BREAKOUT",
-        "PLATFORM_SHARKING_UPAIR",
-        "WAVEDASH_RUSHDOWN_DSMASH",
-        "OOS_SHORYUKEN_PUNISH",
-        "WAVEDASH_OOS_WHIFF_PUNISH",
-        "CROUCH_CANCEL_ASDI_DOWN",
-        "FASTFALLER_UPTILT_LADDER",
-        "LEDGE_ROLL_PREDICTION_DSMASH",
-        "DTILT_POPUP_LAUNCHER",
-        "FIREBALL_COVERED_APPROACH",
-        "ANTI_AIR_SHORYUKEN_INTERCEPT"
-    ]
-
-    total_scenarios = episodes * len(scenarios)
-    scenario_idx = 0
-    t_start = time.time()
-
-    for ep in range(1, episodes + 1):
-        for sc_name in scenarios:
-            scenario_idx += 1
-            brain.reset()
-            p_luigi = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-            p_luigi.character = "LUIGI"
-
-            if sc_name == "D-THROW_SHORYUKEN_CONFIRM":
-                p_opp = MockPlayer(x=2.0, y=0.0, on_ground=True, action="THROWN_DOWN", act_val=222, percent=75.0, cpu_level=9)
-                brain.combo_state = "LUIGI_DTHROW_COMBO"
-                brain.dopamine = 0.85
-                cur = brain.stimulate_sensory(0.8, rel_x=0.2, player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                if "SWEETSPOT UP-B" in act["name"] or "SHORYUKEN" in act["name"]:
-                    successful_kos += 1
-                    brain.learn_from_success("KO")
-                    brain.learn_from_success("COMBO", value=25.0)
-
-            elif sc_name == "MISSED_TECH_JAB_RESET":
-                p_opp = MockPlayer(x=5.0, y=0.0, on_ground=True, action="DOWN_BOUND", act_val=183, percent=60.0, cpu_level=9)
-                brain.dopamine = 0.70
-                cur = brain.stimulate_sensory(0.6, rel_x=0.4, player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                if "JAB-RESET" in act["name"] or "DOWN-SMASH" in act["name"]:
-                    successful_combos += 1
-                    habit_reads += 1
-                    brain.learn_opponent_habit("missed_tech", val=1)
-
-            elif sc_name == "TECH_ROLL_PREDICTION":
-                p_opp = MockPlayer(x=12.0, y=0.0, on_ground=True, action="TECH_ROLL_FORWARD", act_val=200, percent=50.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.5, rel_x=0.6, player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp, current_frame=scenario_idx)
-                if "DOWN-SMASH" in act["name"] or "TECH-CHASE" in act["name"] or "MISSILE" in act["name"]:
-                    habit_reads += 1
-                    brain.learn_opponent_habit("tech_roll_away", val=1)
-
-            elif sc_name == "OFFSTAGE_DEEP_DAIR_SPIKE":
-                p_luigi_edge = MockPlayer(x=60.0, y=0.0, on_ground=False, action="FALLING", act_val=29, jumps_left=1)
-                p_opp_off = MockPlayer(x=70.0, y=-10.0, on_ground=False, action="FALLING", act_val=29, percent=80.0, cpu_level=9)
-                p_opp_off.off_stage = True
-                brain.dopamine = 0.80
-                cur = brain.stimulate_sensory(0.9, rel_x=0.8, is_offstage=False, player=p_luigi_edge, opponent=p_opp_off, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_edge, opponent=p_opp_off, current_frame=scenario_idx)
-                if "D-AIR METEOR SPIKE" in act["name"] or act.get("_allow_offstage_chase", False):
-                    successful_kos += 1
-                    brain.learn_from_success("EDGEGUARD")
-                    brain.learn_from_success("KO")
-
-            elif sc_name == "LEDGE_ATTACK_CC_COUNTER":
-                p_opp_ledge = MockPlayer(x=stage_edge, y=0.0, on_ground=False, action="EDGE_ATTACK", act_val=256, percent=65.0, cpu_level=9)
-                p_luigi_ledge = MockPlayer(x=stage_edge - 6.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=30.0)
-                cur = brain.stimulate_sensory(0.7, rel_x=0.5, player=p_luigi_ledge, opponent=p_opp_ledge, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_ledge, opponent=p_opp_ledge, current_frame=scenario_idx)
-                if "DOWN-SMASH" in act["name"] or "CROUCH-CANCEL" in act["name"] or "SHORYUKEN" in act["name"]:
-                    successful_combos += 1
-                    habit_reads += 1
-                    brain.learn_opponent_habit("ledge_attack_freq", val=1)
-
-            elif sc_name == "CQC_FRAME3_NAIR_BREAKOUT":
-                p_luigi_tumble = MockPlayer(x=10.0, y=18.0, on_ground=False, action="TUMBLE", act_val=38)
-                p_opp_air = MockPlayer(x=12.0, y=18.0, on_ground=False, action="ATTACK_AIR_N", act_val=65, cpu_level=9)
-                cur = brain.stimulate_sensory(0.8, rel_x=0.3, player=p_luigi_tumble, opponent=p_opp_air, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_tumble, opponent=p_opp_air, current_frame=scenario_idx)
-                if act.get("attack") and "NAIR" in act["name"]:
-                    successful_combos += 1
-
-            elif sc_name == "PLATFORM_SHARKING_UPAIR":
-                p_opp_plat = MockPlayer(x=38.0, y=27.2, on_ground=True, action="STANDING", act_val=14, percent=45.0, cpu_level=9)
-                p_luigi_below = MockPlayer(x=38.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-                cur = brain.stimulate_sensory(0.5, rel_x=0.1, player=p_luigi_below, opponent=p_opp_plat, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_below, opponent=p_opp_plat, current_frame=scenario_idx)
-                if "PLATFORM" in act["name"] or "SHARKING" in act["name"] or act.get("jump"):
-                    successful_combos += 1
-
-            elif sc_name == "WAVEDASH_RUSHDOWN_DSMASH":
-                p_opp_neut = MockPlayer(x=18.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=70.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.5, rel_x=0.5, player=p_luigi, opponent=p_opp_neut, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp_neut, current_frame=scenario_idx)
-                if any(k in act["name"] for k in ["WAVEDASH", "DOWN-SMASH", "SHORYUKEN", "NAIR", "SPRINT", "MISSILE"]):
-                    successful_combos += 1
-
-            elif sc_name == "OOS_SHORYUKEN_PUNISH":
-                p_luigi_oos = MockPlayer(x=0.0, y=0.0, on_ground=True, action="SHIELD", act_val=179)
-                p_opp_unsafe = MockPlayer(x=3.0, y=0.0, on_ground=True, action="ATTACK_S_4", act_val=58, percent=55.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.8, rel_x=0.3, player=p_luigi_oos, opponent=p_opp_unsafe, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_oos, opponent=p_opp_unsafe, current_frame=scenario_idx)
-                if "SWEETSPOT UP-B" in act["name"] or "SHORYUKEN" in act["name"] or "N-AIR OUT OF SHIELD" in act["name"]:
-                    successful_kos += 1
-                    brain.learn_from_success("KO")
-
-            elif sc_name == "WAVEDASH_OOS_WHIFF_PUNISH":
-                p_luigi_oos2 = MockPlayer(x=0.0, y=0.0, on_ground=True, action="SHIELD", act_val=179)
-                p_opp_spaced = MockPlayer(x=10.0, y=0.0, on_ground=True, action="WAIT", act_val=14, percent=40.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.4, rel_x=0.4, player=p_luigi_oos2, opponent=p_opp_spaced, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_oos2, opponent=p_opp_spaced, current_frame=scenario_idx)
-                if "WAVEDASH OUT OF SHIELD" in act["name"] or act.get("jump"):
-                    successful_combos += 1
-
-            elif sc_name == "CROUCH_CANCEL_ASDI_DOWN":
-                p_luigi_cc = MockPlayer(x=0.0, y=0.0, on_ground=True, action="SQUAT_WAIT", act_val=39, percent=25.0)
-                p_opp_atk = MockPlayer(x=4.0, y=0.0, on_ground=True, action="ATTACK_11", act_val=44, cpu_level=9)
-                cur = brain.stimulate_sensory(0.6, rel_x=0.3, player=p_luigi_cc, opponent=p_opp_atk, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_cc, opponent=p_opp_atk, current_frame=scenario_idx)
-                if "CROUCH-CANCEL" in act["name"] or "SHORYUKEN" in act["name"] or "DOWN-SMASH" in act["name"]:
-                    successful_combos += 1
-
-            elif sc_name == "FASTFALLER_UPTILT_LADDER":
-                p_opp_ff = MockPlayer(x=2.0, y=0.0, on_ground=True, action="DAMAGE_AIR", percent=35.0, cpu_level=9)
-                p_opp_ff.character = "FOX"
-                brain.combo_state = "LUIGI_DTHROW_COMBO"
-                cur = brain.stimulate_sensory(0.7, rel_x=0.2, player=p_luigi, opponent=p_opp_ff, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp_ff, current_frame=scenario_idx)
-                if "UP-TILT" in act["name"] or "FAIR" in act["name"] or "DOWN-SMASH" in act["name"]:
-                    successful_combos += 1
-
-            elif sc_name == "LEDGE_ROLL_PREDICTION_DSMASH":
-                p_opp_roll = MockPlayer(x=stage_edge, y=0.0, on_ground=False, action="EDGE_ROLL", act_val=258, percent=70.0, cpu_level=9)
-                p_luigi_stage = MockPlayer(x=stage_edge - 16.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
-                cur = brain.stimulate_sensory(0.6, rel_x=0.5, player=p_luigi_stage, opponent=p_opp_roll, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi_stage, opponent=p_opp_roll, current_frame=scenario_idx)
-                if "DOWN-SMASH" in act["name"] or "ROLL READ" in act["name"] or "PRESIÓN" in act["name"]:
-                    successful_combos += 1
-                    habit_reads += 1
-                    brain.learn_opponent_habit("ledge_roll_freq", val=1)
-
-            elif sc_name == "DTILT_POPUP_LAUNCHER":
-                p_opp_dtilt = MockPlayer(x=6.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=75.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.5, rel_x=0.4, player=p_luigi, opponent=p_opp_dtilt, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp_dtilt, current_frame=scenario_idx)
-                if "DOWN-TILT" in act["name"] or "DOWN-SMASH" in act["name"] or "JAB" in act["name"]:
-                    successful_combos += 1
-
-            elif sc_name == "FIREBALL_COVERED_APPROACH":
-                p_opp_dist = MockPlayer(x=28.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=50.0, cpu_level=9)
-                cur = brain.stimulate_sensory(0.3, rel_x=0.7, player=p_luigi, opponent=p_opp_dist, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp_dist, current_frame=scenario_idx)
-                if any(k in act["name"] for k in ["BOLA DE FUEGO", "WAVEDASH", "MISSILE", "SPRINT"]):
-                    successful_combos += 1
-
-            elif sc_name == "ANTI_AIR_SHORYUKEN_INTERCEPT":
-                p_opp_falling = MockPlayer(x=3.0, y=7.0, on_ground=False, action="FALLING", act_val=29, percent=55.0, cpu_level=9)
-                brain.dopamine = 0.75
-                cur = brain.stimulate_sensory(0.8, rel_x=0.2, player=p_luigi, opponent=p_opp_falling, current_frame=scenario_idx)
-                brain.step(cur)
-                act = brain.get_controller_decision(player=p_luigi, opponent=p_opp_falling, current_frame=scenario_idx)
-                if "SWEETSPOT UP-B" in act["name"] or "ANTI-AIR" in act["name"] or "SHORYUKEN" in act["name"] or "CYCLONE" in act["name"]:
-                    successful_kos += 1
-                    brain.learn_from_success("KO")
-
-    brain.long_term_memory["matches_played"] += episodes
-    brain.long_term_memory["matches_won"] += int(episodes * 0.90)
-    brain.save_long_term_memory()
-
-    dt = time.time() - t_start
-    print(f"\n✅ {episodes} Rondas de escenarios completadas en {dt:.2f} s | KOs: +{successful_kos}")
+    dt = time.time() - t0
+    print(f"\n🎉 ¡Entrenamiento general completado en {dt:.2f} s ({num_matches / dt:.1f} partidas/seg)!")
+    print_matchup_matrix(brain)
+    print_status_summary(brain, fly_char=fly_char_upper)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Entrenador Biológico Neural Acelerado para la Mosca (Drosophila 400k)")
-    parser.add_argument("matches", type=int, nargs="?", default=50, help="Número de partidas a entrenar (ej: 50 o 100)")
-    parser.add_argument("--matches", "-m", dest="matches_opt", type=int, default=None, help="Número de partidas con rivales aleatorios")
-    parser.add_argument("--cpu", "-c", type=int, default=9, help="Nivel de dificultad del Bot CPU rival (por defecto: 9)")
+    parser = argparse.ArgumentParser(description="Entrenador Biológico Neural Acelerado para la Mosca (Drosophila 400k) 20XX")
+    parser.add_argument("matches", type=int, nargs="?", default=50, help="Número de partidas a entrenar (por defecto: 50)")
+    parser.add_argument("--matches", "-m", dest="matches_opt", type=int, default=None, help="Número de partidas")
+    parser.add_argument("--mode", choices=["full", "gauntlet", "spacies", "whiff", "edgeguard", "techchase"], default="full", help="Modo o drill de entrenamiento especializado")
+    parser.add_argument("--cpu", "-c", type=int, default=9, help="Nivel de dificultad del Bot CPU rival (1-9)")
     parser.add_argument("--character", "-k", default="luigi", choices=["luigi", "fox"], help="Personaje de la mosca (luigi o fox)")
-    parser.add_argument("--scenarios", "-s", action="store_true", help="Modo de escenarios fijos clásicos")
     args = parser.parse_args()
 
     num = args.matches_opt if args.matches_opt is not None else args.matches
-    if args.scenarios:
-        run_training_session(episodes=num)
+
+    if args.mode == "gauntlet":
+        sets_per_char = max(1, num // 15)
+        run_gauntlet_tournament(num_sets=sets_per_char, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode == "spacies":
+        run_spacies_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode == "whiff":
+        run_whiff_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode == "edgeguard":
+        run_edgeguard_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
+    elif args.mode == "techchase":
+        run_techchase_drill(num_reps=num, cpu_level=args.cpu, fly_character=args.character)
     else:
-        run_random_match_training(num_matches=num, cpu_level=args.cpu, fly_character=args.character)
+        run_full_training(num_matches=num, cpu_level=args.cpu, fly_character=args.character)

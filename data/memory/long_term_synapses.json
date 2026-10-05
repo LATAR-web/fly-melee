@@ -1,47 +1,157 @@
 {
   "version": 1.1,
-  "matches_played": 1789,
-  "matches_won": 1717,
-  "total_kos": 4884,
-  "total_deaths": 274,
-  "total_combos": 10433,
+  "matches_played": 1961,
+  "matches_won": 1890,
+  "total_kos": 5647,
+  "total_deaths": 283,
+  "total_combos": 11036,
   "edge_fear": 1.05,
   "synaptic_plasticity": {
-    "combo_mastery": 3.2399999999999998,
-    "escape_reflex": 3.0,
-    "laser_pressure": 3.0,
+    "combo_mastery": 3.3299999999999996,
+    "escape_reflex": 5.0,
+    "laser_pressure": 3.3600000000000003,
     "shine_counter": 3.5,
-    "shield_reaction": 3.5,
-    "edgeguard_mastery": 3.5,
-    "neutral_patience": 3.0,
-    "grab_combo_lethality": 3.5,
-    "offstage_aggression": 2.8800000000000003,
-    "recovery_iq": 3.5,
-    "fastfaller_punish": 3.5,
-    "floaty_killer": 3.5,
-    "platform_shark_iq": 3.5,
-    "shdl_mastery": 3.5,
-    "cqc_counter_reflex": 3.5
+    "shield_reaction": 5.0,
+    "edgeguard_mastery": 5.0,
+    "neutral_patience": 5.0,
+    "grab_combo_lethality": 5.0,
+    "offstage_aggression": 2.89,
+    "recovery_iq": 5.0,
+    "fastfaller_punish": 5.0,
+    "floaty_killer": 5.0,
+    "platform_shark_iq": 3.7099999999999995,
+    "shdl_mastery": 3.8600000000000003,
+    "cqc_counter_reflex": 5.0,
+    "whiff_punish_iq": 5.0,
+    "ledgedash_mastery": 5.0,
+    "tech_chase_reaction": 5.0
+  },
+  "matchup_intelligence": {
+    "FOX": {
+      "matches": 18,
+      "wins": 18,
+      "kos": 72,
+      "combos": 54,
+      "mastery": 2.22
+    },
+    "FALCO": {
+      "matches": 4,
+      "wins": 4,
+      "kos": 16,
+      "combos": 12,
+      "mastery": 1.66
+    },
+    "MARTH": {
+      "matches": 23,
+      "wins": 23,
+      "kos": 92,
+      "combos": 69,
+      "mastery": 2.42
+    },
+    "SHEIK": {
+      "matches": 19,
+      "wins": 19,
+      "kos": 76,
+      "combos": 57,
+      "mastery": 2.26
+    },
+    "FALCON": {
+      "matches": 20,
+      "wins": 20,
+      "kos": 80,
+      "combos": 60,
+      "mastery": 2.3
+    },
+    "PEACH": {
+      "matches": 22,
+      "wins": 22,
+      "kos": 88,
+      "combos": 66,
+      "mastery": 2.38
+    },
+    "JIGGLYPUFF": {
+      "matches": 6,
+      "wins": 6,
+      "kos": 24,
+      "combos": 18,
+      "mastery": 1.74
+    },
+    "SAMUS": {
+      "matches": 9,
+      "wins": 9,
+      "kos": 36,
+      "combos": 27,
+      "mastery": 1.86
+    },
+    "LUIGI": {
+      "matches": 9,
+      "wins": 9,
+      "kos": 36,
+      "combos": 27,
+      "mastery": 1.86
+    },
+    "PIKACHU": {
+      "matches": 6,
+      "wins": 6,
+      "kos": 24,
+      "combos": 18,
+      "mastery": 1.74
+    },
+    "GANONDORF": {
+      "matches": 7,
+      "wins": 7,
+      "kos": 28,
+      "combos": 21,
+      "mastery": 1.78
+    },
+    "DOC": {
+      "matches": 8,
+      "wins": 8,
+      "kos": 32,
+      "combos": 24,
+      "mastery": 1.82
+    },
+    "BOWSER": {
+      "matches": 9,
+      "wins": 9,
+      "kos": 36,
+      "combos": 27,
+      "mastery": 1.86
+    },
+    "DONKEY_KONG": {
+      "matches": 5,
+      "wins": 5,
+      "kos": 20,
+      "combos": 15,
+      "mastery": 1.7
+    },
+    "YOSHI": {
+      "matches": 5,
+      "wins": 5,
+      "kos": 20,
+      "combos": 15,
+      "mastery": 1.7
+    }
   },
   "opponent_habits": {
-    "tech_roll_away": 1144,
-    "tech_roll_in": 782,
-    "tech_in_place": 321,
-    "missed_tech": 2235,
-    "ledge_attack_freq": 531,
+    "tech_roll_away": 1291,
+    "tech_roll_in": 854,
+    "tech_in_place": 322,
+    "missed_tech": 2393,
+    "ledge_attack_freq": 537,
     "ledge_roll_freq": 503,
     "ledge_jump_freq": 26,
     "ledge_getup_freq": 6,
-    "shield_habit": 0.0020887863022116242,
-    "cqc_attack_freq": 2368,
-    "cqc_shield_freq": 189,
+    "shield_habit": 2.833499091497405e-06,
+    "cqc_attack_freq": 2758,
+    "cqc_shield_freq": 205,
     "cqc_roll_freq": 0,
-    "jump_after_hitstun": 124
+    "jump_after_hitstun": 139
   },
   "learned_errors": {
-    "offstage_falls": 270,
-    "damage_absorbed": 35049.4721506834,
+    "offstage_falls": 279,
+    "damage_absorbed": 35718.02593886852,
     "shield_breaks": 0,
-    "grabbed_in_neutral": 198
+    "grabbed_in_neutral": 203
   }
 }

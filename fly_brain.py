@@ -198,8 +198,12 @@ class FlyBrain:
                 "floaty_killer": 1.60,
                 "platform_shark_iq": 1.55,
                 "shdl_mastery": 1.40,
-                "cqc_counter_reflex": 1.60
+                "cqc_counter_reflex": 1.60,
+                "whiff_punish_iq": 1.70,
+                "ledgedash_mastery": 1.70,
+                "tech_chase_reaction": 1.75
             },
+            "matchup_intelligence": {},
             "opponent_habits": {
                 "tech_roll_away": 0,
                 "tech_roll_in": 0,
@@ -275,20 +279,19 @@ class FlyBrain:
             self.long_term_memory["total_deaths"] += 1
             self.long_term_memory["learned_errors"]["offstage_falls"] += 1
             self.long_term_memory["edge_fear"] = min(1.30, self.long_term_memory["edge_fear"] + 0.02 * severity)
-            self.long_term_memory["synaptic_plasticity"]["escape_reflex"] = min(3.5, self.long_term_memory["synaptic_plasticity"]["escape_reflex"] + 0.05)
+            self.long_term_memory["synaptic_plasticity"]["escape_reflex"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("escape_reflex", 1.50) + 0.05)
             self.save_long_term_memory()
 
         elif error_type == "DAMAGE_TAKEN":
             self.long_term_memory["learned_errors"]["damage_absorbed"] += float(severity)
-            self.long_term_memory["synaptic_plasticity"]["laser_pressure"] = min(3.0, self.long_term_memory["synaptic_plasticity"]["laser_pressure"] + 0.005 * severity)
+            self.long_term_memory["synaptic_plasticity"]["laser_pressure"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("laser_pressure", 1.25) + 0.005 * severity)
 
         elif error_type == "GRABBED_IN_NEUTRAL":
             self.long_term_memory["learned_errors"]["grabbed_in_neutral"] = self.long_term_memory["learned_errors"].get("grabbed_in_neutral", 0) + 1
-            # Aumentar la reacción de escudo / shine / n-air frame-3
             p = self.long_term_memory["synaptic_plasticity"]
-            p["shield_reaction"] = min(3.5, p.get("shield_reaction", 1.40) + 0.06)
-            p["cqc_counter_reflex"] = min(3.5, p.get("cqc_counter_reflex", 1.50) + 0.06)
-            p["shine_counter"] = min(3.5, p.get("shine_counter", 1.30) + 0.06)
+            p["shield_reaction"] = min(5.0, p.get("shield_reaction", 1.40) + 0.08)
+            p["cqc_counter_reflex"] = min(5.0, p.get("cqc_counter_reflex", 1.50) + 0.08)
+            p["shine_counter"] = min(5.0, p.get("shine_counter", 1.30) + 0.08)
             self.save_long_term_memory()
 
         elif error_type == "SHIELD_BREAK":
@@ -297,17 +300,33 @@ class FlyBrain:
 
         elif error_type == "MATCH_LOST":
             self.long_term_memory["edge_fear"] = min(1.30, self.long_term_memory["edge_fear"] + 0.02)
-            self.long_term_memory["synaptic_plasticity"]["cqc_counter_reflex"] = min(3.5, self.long_term_memory["synaptic_plasticity"].get("cqc_counter_reflex", 1.50) + 0.05)
+            self.long_term_memory["synaptic_plasticity"]["cqc_counter_reflex"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("cqc_counter_reflex", 1.50) + 0.06)
             self.save_long_term_memory()
+
+    def learn_matchup(self, char_name, won=True, kos=4, combos=6):
+        """Registra la maestría acumulada y memoria específica contra un personaje de Melee."""
+        c = str(char_name).upper()
+        mi = self.long_term_memory.setdefault("matchup_intelligence", {})
+        if c not in mi:
+            mi[c] = {"matches": 0, "wins": 0, "kos": 0, "combos": 0, "mastery": 1.50}
+        entry = mi[c]
+        entry["matches"] += 1
+        if won:
+            entry["wins"] += 1
+            entry["mastery"] = round(min(5.0, entry["mastery"] + 0.04), 2)
+        entry["kos"] += kos
+        entry["combos"] += combos
 
     def learn_from_success(self, success_type, value=1.0, verbose=False):
         """Plasticidad sináptica positiva (LTP, agresión ofensiva y consolidación de combos)."""
         p = self.long_term_memory["synaptic_plasticity"]
+        max_p = 5.0
         if success_type == "KO":
             self.long_term_memory["total_kos"] += 1
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.08)
-            p["edgeguard_mastery"] = min(3.5, p.get("edgeguard_mastery", 1.50) + 0.08)
-            p["offstage_aggression"] = min(3.5, p.get("offstage_aggression", 1.45) + 0.08)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.08)
+            p["edgeguard_mastery"] = min(max_p, p.get("edgeguard_mastery", 1.50) + 0.08)
+            p["offstage_aggression"] = min(max_p, p.get("offstage_aggression", 1.45) + 0.08)
+            p["fastfaller_punish"] = min(max_p, p.get("fastfaller_punish", 1.60) + 0.04)
             # El éxito reduce la vacilación en el borde
             self.long_term_memory["edge_fear"] = max(1.05, self.long_term_memory.get("edge_fear", 1.15) - 0.03)
             if verbose or getattr(self, "verbose_learning", False):
@@ -316,60 +335,77 @@ class FlyBrain:
 
         elif success_type == "COMBO":
             self.long_term_memory["total_combos"] += 1
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.01 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.02 * value)
 
         elif success_type == "GRAB_COMBO":
-            p["grab_combo_lethality"] = min(3.5, p.get("grab_combo_lethality", 1.60) + 0.05 * value)
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.03)
+            p["grab_combo_lethality"] = min(max_p, p.get("grab_combo_lethality", 1.60) + 0.06 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.04)
+            p["fastfaller_punish"] = min(max_p, p.get("fastfaller_punish", 1.60) + 0.04)
 
         elif success_type == "EDGEGUARD":
-            p["edgeguard_mastery"] = min(3.5, p.get("edgeguard_mastery", 1.50) + 0.08)
-            p["offstage_aggression"] = min(3.5, p.get("offstage_aggression", 1.45) + 0.06)
+            p["edgeguard_mastery"] = min(max_p, p.get("edgeguard_mastery", 1.50) + 0.08)
+            p["offstage_aggression"] = min(max_p, p.get("offstage_aggression", 1.45) + 0.07)
+            p["ledgedash_mastery"] = min(max_p, p.get("ledgedash_mastery", 1.70) + 0.06)
 
         elif success_type == "OFFSTAGE_SHINE":
-            p["offstage_aggression"] = min(3.5, p.get("offstage_aggression", 1.45) + 0.10)
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.05)
-            p["edgeguard_mastery"] = min(3.5, p.get("edgeguard_mastery", 1.50) + 0.10)
+            p["offstage_aggression"] = min(max_p, p.get("offstage_aggression", 1.45) + 0.10)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.06)
+            p["edgeguard_mastery"] = min(max_p, p.get("edgeguard_mastery", 1.50) + 0.10)
 
         elif success_type == "SHIELD_PUNISH":
-            p["shield_reaction"] = min(3.5, p.get("shield_reaction", 1.40) + 0.05)
+            p["shield_reaction"] = min(max_p, p.get("shield_reaction", 1.40) + 0.06)
+            p["cqc_counter_reflex"] = min(max_p, p.get("cqc_counter_reflex", 1.60) + 0.05)
 
         elif success_type == "SAFE_RECOVERY":
-            p["escape_reflex"] = min(3.0, p.get("escape_reflex", 1.50) + 0.05)
-            p["recovery_iq"] = min(3.5, p.get("recovery_iq", 1.50) + 0.05)
+            p["escape_reflex"] = min(max_p, p.get("escape_reflex", 1.50) + 0.05)
+            p["recovery_iq"] = min(max_p, p.get("recovery_iq", 1.50) + 0.06)
 
         elif success_type == "UPTILT_JUGGLE":
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.04)
-            p["fastfaller_punish"] = min(3.5, p.get("fastfaller_punish", 1.50) + 0.05)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.05)
+            p["fastfaller_punish"] = min(max_p, p.get("fastfaller_punish", 1.50) + 0.06)
 
         elif success_type == "DRILL_SMASH":
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.40) + 0.05)
-            p["floaty_killer"] = min(3.5, p.get("floaty_killer", 1.50) + 0.06)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.06)
+            p["floaty_killer"] = min(max_p, p.get("floaty_killer", 1.50) + 0.07)
 
         elif success_type == "PLATFORM_SHARK":
-            p["platform_shark_iq"] = min(3.5, p.get("platform_shark_iq", 1.45) + 0.06)
+            p["platform_shark_iq"] = min(max_p, p.get("platform_shark_iq", 1.45) + 0.07)
 
         elif success_type == "SHDL":
-            p["shdl_mastery"] = min(3.5, p.get("shdl_mastery", 1.40) + 0.05)
+            p["shdl_mastery"] = min(max_p, p.get("shdl_mastery", 1.40) + 0.06)
+            p["laser_pressure"] = min(max_p, p.get("laser_pressure", 1.25) + 0.06)
 
         elif success_type == "CQC_COUNTER":
-            p["cqc_counter_reflex"] = min(3.5, p.get("cqc_counter_reflex", 1.50) + 0.05)
+            p["cqc_counter_reflex"] = min(max_p, p.get("cqc_counter_reflex", 1.50) + 0.07)
 
         elif success_type == "PUMMEL":
-            p["grab_combo_lethality"] = min(3.5, p.get("grab_combo_lethality", 1.70) + 0.04 * value)
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.60) + 0.02 * value)
+            p["grab_combo_lethality"] = min(max_p, p.get("grab_combo_lethality", 1.70) + 0.05 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.03 * value)
 
         elif success_type == "L_CANCEL":
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.60) + 0.02 * value)
-            p["escape_reflex"] = min(3.5, p.get("escape_reflex", 1.50) + 0.02 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.03 * value)
+            p["escape_reflex"] = min(max_p, p.get("escape_reflex", 1.50) + 0.03 * value)
 
         elif success_type == "SHORYUKEN_SWEETSPOT":
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.60) + 0.06 * value)
-            p["cqc_counter_reflex"] = min(3.5, p.get("cqc_counter_reflex", 1.60) + 0.05 * value)
-            p["fastfaller_punish"] = min(3.5, p.get("fastfaller_punish", 1.60) + 0.04 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.07 * value)
+            p["cqc_counter_reflex"] = min(max_p, p.get("cqc_counter_reflex", 1.60) + 0.06 * value)
+            p["fastfaller_punish"] = min(max_p, p.get("fastfaller_punish", 1.60) + 0.05 * value)
+
+        elif success_type == "WHIFF_PUNISH":
+            p["whiff_punish_iq"] = min(max_p, p.get("whiff_punish_iq", 1.70) + 0.08 * value)
+            p["neutral_patience"] = min(max_p, p.get("neutral_patience", 1.20) + 0.06 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.04 * value)
+
+        elif success_type == "LEDGEDASH":
+            p["ledgedash_mastery"] = min(max_p, p.get("ledgedash_mastery", 1.70) + 0.08 * value)
+            p["recovery_iq"] = min(max_p, p.get("recovery_iq", 1.50) + 0.06 * value)
+
+        elif success_type == "TECH_CHASE":
+            p["tech_chase_reaction"] = min(max_p, p.get("tech_chase_reaction", 1.75) + 0.08 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.04 * value)
 
         elif success_type == "DAMAGE_DEALT":
-            p["combo_mastery"] = min(3.5, p.get("combo_mastery", 1.60) + 0.005 * value)
+            p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.005 * value)
 
         elif success_type == "MATCH_WON":
             self.long_term_memory["matches_won"] += 1
@@ -2662,8 +2698,9 @@ class FlyBrain:
         if self.combo_state == "LUIGI_DTHROW_COMBO" or is_throw_down:
             self.combo_timer += 1
             if getattr(player, "on_ground", True):
-                # CHAINGRAB 20XX CONTRA FASTFALLERS (FOX, FALCO, FALCON) A BAJO % (<40%)
-                if archetype == "FASTFALLER" and opp_pct < 40.0 and dist <= 13.0 and getattr(self, "chaingrab_count", 0) < 3:
+                # CHAINGRAB 20XX CONTRA FASTFALLERS (FOX, FALCO, FALCON) A BAJO % (<45%)
+                ff_punish = self.get_plasticity("fastfaller_punish", 1.60)
+                if archetype == "FASTFALLER" and opp_pct < 45.0 and dist <= 14.0 and getattr(self, "chaingrab_count", 0) < 3:
                     self.chaingrab_count = getattr(self, "chaingrab_count", 0) + 1
                     self.combo_count += 1
                     self.dopamine = min(1.0, self.dopamine + 0.25)
@@ -3352,8 +3389,8 @@ class FlyBrain:
 
             if is_opp_attacking:
                 cqc_reflex = self.get_plasticity("cqc_counter_reflex", 1.50)
-                cc_shoryu_limit = min(95.0, 75.0 * (cqc_reflex / 1.50))
-                cc_dsmash_limit = min(90.0, 60.0 * (cqc_reflex / 1.50))
+                cc_shoryu_limit = min(115.0, 75.0 * (cqc_reflex / 1.50))
+                cc_dsmash_limit = min(110.0, 60.0 * (cqc_reflex / 1.50))
                 if dist <= 5.5 and getattr(player, "percent", 0.0) < cc_shoryu_limit:
                     self.learn_from_success("CQC_COUNTER")
                     self.last_luigi_power = "UPB_SHORYUKEN"
@@ -3375,6 +3412,7 @@ class FlyBrain:
                     self.luigi_jump_action = "WAVEDASH_BACK"
                     self.luigi_wd_dir = 1.0 - towards_opp
                     self.luigi_jump_frame = current_frame
+                    self.learn_from_success("WHIFF_PUNISH")
                     return self._enforce_safety({
                         "name": "⚡ VIST WAVEDASH-BACK BAIT: MICROCANCEL FUERA DE ALCANCE",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
@@ -3429,8 +3467,10 @@ class FlyBrain:
         # 11. NEUTRAL TÁCTICO: PODERES, ATAQUES AÉREOS & WAVEDASHING (11.0 < dist <= 24.0 u)
         # =========================================================================
         elif dist <= 24.0:
-            # 0. WHIFF PUNISH VIST: Si el rival está atacando al aire a distancia de whiff (11.0 < dist <= 14.5)
-            if is_opp_attacking and dist <= 14.5 and getattr(player, "on_ground", True):
+            # 0. WHIFF PUNISH VIST: Si el rival está atacando al aire a distancia de whiff (11.0 < dist <= 14.5 o ampliado por whiff_punish_iq)
+            whiff_iq = self.get_plasticity("whiff_punish_iq", 1.70)
+            whiff_trigger_dist = min(17.5, 14.5 * (whiff_iq / 1.70))
+            if is_opp_attacking and dist <= whiff_trigger_dist and getattr(player, "on_ground", True):
                 is_ready = (getattr(self, "whiff_punish_state", None) == "PUNISH_READY") and (current_frame - getattr(self, "whiff_punish_frame", -100) <= 12)
                 if is_ready:
                     self.whiff_punish_state = None
