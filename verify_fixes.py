@@ -1551,8 +1551,104 @@ def run_tests():
     assert "PLATFORM EDGE-CANCEL" in act_edge_cancel["name"]
     print("✅ TEST 76 SUPERADO: Luigi desliza el aterrizaje fuera del borde de plataforma a 0 frames de lag.")
 
+    # -------------------------------------------------------------
+    # TEST 77: Luigi Short-Hop B-Air Wall (Patada Trasera Dropkick)
+    # -------------------------------------------------------------
+    print("\n--- Test 77: Luigi Short-Hop B-Air Wall ---")
+    p_luigi_bair_jump = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_bair_jump.character = "LUIGI"
+    p_luigi_bair_jump.facing = True
+    p_opp_behind = MockPlayer(x=-18.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    brain.reset()
+    act_bair_sh = brain.get_luigi_decision(player=p_luigi_bair_jump, opponent=p_opp_behind, current_frame=3, stage="BATTLEFIELD")
+    print(f"B-Air Wall Jump Init: {act_bair_sh['name']} | Jump={act_bair_sh['jump']}, ActionQueued={brain.luigi_jump_action}")
+    assert act_bair_sh["jump"] and brain.luigi_jump_action == "AERIAL_BAIR"
+    
+    p_luigi_air = MockPlayer(x=-2.0, y=5.0, on_ground=False, action="JUMP_F", act_val=25)
+    p_luigi_air.character = "LUIGI"
+    p_luigi_air.facing = True
+    act_bair_exec = brain.get_luigi_decision(player=p_luigi_air, opponent=p_opp_behind, current_frame=4, stage="BATTLEFIELD")
+    print(f"B-Air Wall Aerial Exec: {act_bair_exec['name']} | Attack={act_bair_exec['attack']}, C-Stick X={act_bair_exec.get('c_stick_x', 0.5)}")
+    assert act_bair_exec["attack"] and "SHORT-HOP B-AIR WALL" in act_bair_exec["name"]
+    assert act_bair_exec.get("c_stick_x") == 0.0
+    print("✅ TEST 77 SUPERADO: Luigi ejecuta buffered Short-Hop B-Air Wall con patada dropkick de espalda.")
+
+    # -------------------------------------------------------------
+    # TEST 78: Luigi Ledge-Stall Invincible Regrab
+    # -------------------------------------------------------------
+    print("\n--- Test 78: Luigi Ledge-Stall Invincible Regrab ---")
+    p_luigi_ledge_stall = MockPlayer(x=-68.4, y=-5.0, on_ground=False, action="EDGE_HANGING", act_val=253)
+    p_luigi_ledge_stall.character = "LUIGI"
+    p_luigi_ledge_stall.jumps_left = 1
+    brain.reset()
+    brain.luigi_ledge_state = None
+    brain.luigi_ledge_timer = 27
+    act_ledgestall = brain.get_luigi_decision(player=p_luigi_ledge_stall, opponent=p_opp_center, current_frame=1240, stage="BATTLEFIELD")
+    print(f"Ledge-Stall Action: {act_ledgestall['name']} | Jump={act_ledgestall['jump']}, Stick Y={act_ledgestall['stick_y']}")
+    assert act_ledgestall["jump"] and "LEDGE-STALL" in act_ledgestall["name"]
+    assert brain.luigi_ledge_timer == 0
+    print("✅ TEST 78 SUPERADO: Luigi ejecuta Ledge-Stall invencible para refrescar 30 frames de intangibilidad.")
+
+    # -------------------------------------------------------------
+    # TEST 79: Luigi Wavedash Down-Tilt Launcher
+    # -------------------------------------------------------------
+    print("\n--- Test 79: Luigi Wavedash Down-Tilt Launcher ---")
+    p_luigi_dtilt = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_dtilt.character = "LUIGI"
+    p_opp_dtilt = MockPlayer(x=15.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=60.0)
+    brain.reset()
+    act_dtilt = brain.get_luigi_decision(player=p_luigi_dtilt, opponent=p_opp_dtilt, current_frame=70, stage="BATTLEFIELD")
+    print(f"Down-Tilt Launcher Neutral: {act_dtilt['name']} | Attack={act_dtilt['attack']}, Stick Y={act_dtilt['stick_y']}")
+    assert act_dtilt["attack"] and act_dtilt["stick_y"] == 0.25 and "DOWN-TILT" in act_dtilt["name"]
+    print("✅ TEST 79 SUPERADO: Luigi desliza Down-Tilt launcher para pop-up vertical hacia combos aéreos.")
+
+    # -------------------------------------------------------------
+    # TEST 80: Modulación Biológica por Descarga de Clusters (5, 6 y 7)
+    # -------------------------------------------------------------
+    print("\n--- Test 80: Modulación Biológica por Descarga de Clusters ---")
+    # A) Cluster 5 (Giant Fiber DNp01 / Evasión Saccádica):
+    brain.reset()
+    p_fox_gf = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_gf.character = "FOX"
+    p_opp_atk = MockPlayer(x=8.0, y=0.0, on_ground=True, action="ATTACK_DASH", act_val=45)
+    brain.spikes[brain.map_gf[:30]] = 1.0
+    act_fox_saccade = brain.get_fox_decision(player=p_fox_gf, opponent=p_opp_atk, current_frame=1260, stage="BATTLEFIELD")
+    print(f"Cluster 5 Giant Fiber Saccade: {act_fox_saccade['name']} | Jump={act_fox_saccade['jump']}")
+    assert act_fox_saccade["jump"] and "GIANT FIBER SACCADE" in act_fox_saccade["name"]
+
+    # B) Cluster 6 (VNC Precisión 20XX / Shine Out of Shield):
+    brain.reset()
+    p_fox_shld = MockPlayer(x=0.0, y=0.0, on_ground=True, action="SHIELD", act_val=179)
+    p_fox_shld.character = "FOX"
+    p_opp_close = MockPlayer(x=6.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    brain.spikes[brain.map_powershield[:30]] = 1.0
+    act_fox_c6 = brain.get_fox_decision(player=p_fox_shld, opponent=p_opp_close, current_frame=1261, stage="BATTLEFIELD")
+    print(f"Cluster 6 Precision Shine OoS: {act_fox_c6['name']} | Special={act_fox_c6['special']}")
+    assert act_fox_c6["special"] and "Cluster 6 Precision" in act_fox_c6["name"]
+
+    # C) Cluster 7 (Red Cerebelar de Combos / Extension):
+    brain.reset()
+    p_fox_ground = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_ground.character = "FOX"
+    p_opp_tumble = MockPlayer(x=9.0, y=0.0, on_ground=True, action="DAMAGE_AIR", act_val=75)
+    brain.spikes[brain.map_combo[:30]] = 1.0
+    act_fox_c7 = brain.get_fox_decision(player=p_fox_ground, opponent=p_opp_tumble, current_frame=1262, stage="BATTLEFIELD")
+    print(f"Cluster 7 Cerebellar Combo Extension: {act_fox_c7['name']} | Attack={act_fox_c7['attack']}")
+    assert act_fox_c7["attack"] and "Cluster 7" in act_fox_c7["name"]
+    print("✅ TEST 80 SUPERADO: Clusters biológicos 5, 6 y 7 modulan directamente la toma de decisiones en tiempo real.")
+
+    # -------------------------------------------------------------
+    # TEST 81: Simulación Biológica a 60Hz Nativos en fly_melee.py
+    # -------------------------------------------------------------
+    print("\n--- Test 81: Simulación Biológica a 60Hz Nativos ---")
+    with open("fly_melee.py", "r", encoding="utf-8") as f:
+        fly_melee_code = f.read()
+    assert "brain.step(current)" in fly_melee_code
+    assert "if step_count % 2 == 0:\n                        brain.step(current)" not in fly_melee_code
+    print("✅ TEST 81 SUPERADO: fly_melee.py ejecuta brain.step(current) a 60Hz nativos en cada frame sin throttle.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (76/76 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (81/81 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

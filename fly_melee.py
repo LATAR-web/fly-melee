@@ -599,9 +599,8 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                         current_frame=step_count
                     )
                     
-                    # 3. Avanzar simulación biológica LIF (optimizado a 30Hz para garantizar 60 FPS estables sin lag)
-                    if step_count % 2 == 0:
-                        brain.step(current)
+                    # 3. Avanzar simulación biológica LIF a 60Hz nativos en tiempo real (CSC sub-milisecond)
+                    brain.step(current)
                     
                     # 4. Decodificar decisión técnica inteligente (Luigi o Fox según personaje en P1)
                     action = brain.get_controller_decision(player=fly_player, opponent=human_player, current_frame=step_count, stage=current_stage)
