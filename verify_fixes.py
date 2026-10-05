@@ -1359,8 +1359,117 @@ def run_tests():
     brain.active_character = "LUIGI"
     print("✅ TEST 66 SUPERADO: Fox ejecuta su icónico taunt 'Come on!' ante el respawn del rival.")
 
+    # -------------------------------------------------------------
+    # TEST 67: Luigi Vist / Abate Wavedash-Back Whiff Punisher
+    # -------------------------------------------------------------
+    print("\n--- Test 67: Luigi Vist / Abate Wavedash-Back Whiff Punisher ---")
+    p_luigi_vist = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_vist.character = "LUIGI"
+    p_opp_whiff = MockPlayer(x=8.0, y=0.0, on_ground=True, action="ATTACK_S_3", act_val=55, percent=45.0)
+    
+    # Frame 1100: Luigi detecta el ataque y ejecuta micro Wavedash-Back hacia la izquierda
+    act_whiff_bait = brain.get_luigi_decision(player=p_luigi_vist, opponent=p_opp_whiff, current_frame=1100, stage="BATTLEFIELD")
+    print(f"Paso 1 (Bait Wavedash-Back): {act_whiff_bait['name']} | Jump={act_whiff_bait['jump']}, Stick X={act_whiff_bait['stick_x']}")
+    assert act_whiff_bait["jump"] and act_whiff_bait["stick_x"] == 0.0 and "VIST WAVEDASH-BACK BAIT" in act_whiff_bait["name"]
+    assert brain.whiff_punish_state == "PUNISH_READY"
+    
+    # Frame 1102: Rival falla (whiff lag) y Luigi castiga con Sweetspot Up-B Shoryuken de frente
+    p_opp_whiff.position.x = 5.0
+    brain.dopamine = 0.80
+    act_whiff_punish = brain.get_luigi_decision(player=p_luigi_vist, opponent=p_opp_whiff, current_frame=1102, stage="BATTLEFIELD")
+    print(f"Paso 2 (Whiff Punish Ping): {act_whiff_punish['name']} | Special={act_whiff_punish['special']}, Stick Y={act_whiff_punish['stick_y']}")
+    assert act_whiff_punish["special"] and act_whiff_punish["stick_y"] == 1.0 and "VIST WHIFF PUNISH" in act_whiff_punish["name"]
+    print("✅ TEST 67 SUPERADO: Luigi ejecuta el legendario Vist Wavedash-Back para provocar el whiff y castigar con Sweetspot Up-B.")
+
+    # -------------------------------------------------------------
+    # TEST 68: Luigi Fastfaller Chaingrab / Regrab Loop
+    # -------------------------------------------------------------
+    print("\n--- Test 68: Luigi Fastfaller Chaingrab / Regrab Loop ---")
+    p_luigi_cg = MockPlayer(x=0.0, y=0.0, on_ground=True, action="THROW_DOWN", act_val=222)
+    p_luigi_cg.character = "LUIGI"
+    p_opp_fastfaller = MockPlayer(x=3.0, y=0.0, on_ground=True, action="DAMAGE_AIR", percent=18.0)
+    p_opp_fastfaller.character = "FOX"
+    brain.chaingrab_count = 0
+    brain.combo_state = "LUIGI_DTHROW_COMBO"
+    
+    # Regrab 1: A 18% contra Fox tras D-Throw
+    act_regrab1 = brain.get_luigi_decision(player=p_luigi_cg, opponent=p_opp_fastfaller, current_frame=1120, stage="BATTLEFIELD")
+    print(f"Chaingrab Paso 1: {act_regrab1['name']} | Grab={act_regrab1['grab']}")
+    assert act_regrab1["grab"] and "CHAINGRAB 20XX" in act_regrab1["name"] and brain.chaingrab_count == 1
+    
+    # Regrab 2: Segundo lanzamiento a 28%
+    p_opp_fastfaller.percent = 28.0
+    act_regrab2 = brain.get_luigi_decision(player=p_luigi_cg, opponent=p_opp_fastfaller, current_frame=1125, stage="BATTLEFIELD")
+    print(f"Chaingrab Paso 2: {act_regrab2['name']} | Grab={act_regrab2['grab']}")
+    assert act_regrab2["grab"] and "CHAINGRAB 20XX" in act_regrab2["name"] and brain.chaingrab_count == 2
+    
+    # Finisher: A 50% ejecuta el Sweetspot Up-B Kill Confirm
+    p_opp_fastfaller.percent = 50.0
+    brain.dopamine = 0.85
+    act_cg_finisher = brain.get_luigi_decision(player=p_luigi_cg, opponent=p_opp_fastfaller, current_frame=1130, stage="BATTLEFIELD")
+    print(f"Chaingrab Finisher: {act_cg_finisher['name']} | Special={act_cg_finisher['special']}")
+    assert act_cg_finisher["special"] and "COMBO SUPREMO SHORYUKEN" in act_cg_finisher["name"]
+    print("✅ TEST 68 SUPERADO: Luigi ejecuta la cadena de regrabs contra Fastfallers antes de rematar con Shoryuken.")
+
+    # -------------------------------------------------------------
+    # TEST 69: Deep Offstage Humiliation & Rapid Teabag Disrespect
+    # -------------------------------------------------------------
+    print("\n--- Test 69: Deep Offstage Humiliation & Rapid Teabag Disrespect ---")
+    p_luigi_safe = MockPlayer(x=10.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_safe.character = "LUIGI"
+    p_opp_abyss = MockPlayer(x=80.0, y=-18.0, on_ground=False, action="DAMAGE_FALL", act_val=38, percent=85.0)
+    p_opp_abyss.off_stage = True
+    
+    # Luigi teabag when opponent is dying deep offstage
+    act_luigi_teabag = brain.get_luigi_decision(player=p_luigi_safe, opponent=p_opp_abyss, current_frame=1150, stage="BATTLEFIELD")
+    print(f"Luigi Abyss Disrespect: {act_luigi_teabag['name']} | Stick Y={act_luigi_teabag['stick_y']}")
+    assert "RAPID TEABAG DISRESPECT" in act_luigi_teabag["name"]
+    
+    # Fox teabag / multishine flex
+    p_fox_safe = MockPlayer(x=10.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_safe.character = "FOX"
+    act_fox_teabag = brain.get_fox_decision(player=p_fox_safe, opponent=p_opp_abyss, current_frame=1150, stage="BATTLEFIELD")
+    print(f"Fox Abyss Disrespect: {act_fox_teabag['name']}")
+    assert "RAPID TEABAG / MULTI-SHINE FLEX" in act_fox_teabag["name"]
+    print("✅ TEST 69 SUPERADO: Tanto Luigi como Fox humillan psicológicamente al rival que cae al abismo.")
+
+    # -------------------------------------------------------------
+    # TEST 70: Luigi Invincible 2-Stage Ledgedash
+    # -------------------------------------------------------------
+    print("\n--- Test 70: Luigi Invincible 2-Stage Ledgedash ---")
+    p_luigi_hang = MockPlayer(x=-68.4, y=-5.0, on_ground=False, action="EDGE_HANGING", act_val=253)
+    p_luigi_hang.character = "LUIGI"
+    p_opp_center = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    brain.luigi_ledge_state = None
+    
+    # Stage 1: Drop/Jump hacia el escenario
+    act_ld_stage1 = brain.get_luigi_decision(player=p_luigi_hang, opponent=p_opp_center, current_frame=1160, stage="BATTLEFIELD")
+    print(f"Ledgedash Paso 1: {act_ld_stage1['name']} | Jump={act_ld_stage1['jump']}, Shield={act_ld_stage1['shield']}")
+    assert act_ld_stage1["jump"] and act_ld_stage1["stick_x"] == 1.0 and "SUBIDA CON WAVEDASH DESLIZANTE" in act_ld_stage1["name"]
+    assert brain.luigi_ledge_state == "LEDGEDASH_AIR"
+    
+    # Stage 2: Waveland invencible en pista
+    act_ld_stage2 = brain.get_luigi_decision(player=p_luigi_hang, opponent=p_opp_center, current_frame=1161, stage="BATTLEFIELD")
+    print(f"Ledgedash Paso 2: {act_ld_stage2['name']} | Jump={act_ld_stage2['jump']}, Shield={act_ld_stage2['shield']}")
+    assert not act_ld_stage2["jump"] and act_ld_stage2["shield"] and "WAVELAND INVENCIBLE" in act_ld_stage2["name"]
+    print("✅ TEST 70 SUPERADO: Luigi domina el Ledgedash en dos tiempos con 14 frames de intangibilidad deslizante.")
+
+    # -------------------------------------------------------------
+    # TEST 71: Fox Drill-Shine Frame-1 Shield Pressure
+    # -------------------------------------------------------------
+    print("\n--- Test 71: Fox Drill-Shine Frame-1 Shield Pressure ---")
+    p_fox_drill_land = MockPlayer(x=2.0, y=0.0, on_ground=True, action="LANDING", act_val=42)
+    p_fox_drill_land.character = "FOX"
+    p_opp_shield = MockPlayer(x=5.0, y=0.0, on_ground=True, action="SHIELD", act_val=179)
+    brain.drill_smash_state = "DRILL_LANDED"
+    
+    act_drill_shine = brain.get_fox_decision(player=p_fox_drill_land, opponent=p_opp_shield, current_frame=1170, stage="BATTLEFIELD")
+    print(f"Fox Drill-Shine on Shield: {act_drill_shine['name']} | Special={act_drill_shine['special']}, Stick Y={act_drill_shine['stick_y']}")
+    assert act_drill_shine["special"] and act_drill_shine["stick_y"] == 0.0 and "DRILL-SHINE SHIELD PRESSURE" in act_drill_shine["name"]
+    print("✅ TEST 71 SUPERADO: Fox ejecuta Drill-Shine Frame-1 en el aterrizaje para neutralizar el escudo rival.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (66/66 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (71/71 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

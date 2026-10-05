@@ -1,13 +1,13 @@
 {
   "version": 1.1,
-  "matches_played": 1707,
-  "matches_won": 1628,
-  "total_kos": 4668,
-  "total_deaths": 266,
-  "total_combos": 10088,
-  "edge_fear": 1.0458,
+  "matches_played": 1789,
+  "matches_won": 1714,
+  "total_kos": 4864,
+  "total_deaths": 274,
+  "total_combos": 10429,
+  "edge_fear": 1.05,
   "synaptic_plasticity": {
-    "combo_mastery": 3.5,
+    "combo_mastery": 3.2399999999999998,
     "escape_reflex": 3.0,
     "laser_pressure": 3.0,
     "shine_counter": 3.5,
@@ -15,7 +15,7 @@
     "edgeguard_mastery": 3.5,
     "neutral_patience": 3.0,
     "grab_combo_lethality": 3.5,
-    "offstage_aggression": 3.5,
+    "offstage_aggression": 2.8800000000000003,
     "recovery_iq": 3.5,
     "fastfaller_punish": 3.5,
     "floaty_killer": 3.5,
@@ -24,24 +24,24 @@
     "cqc_counter_reflex": 3.5
   },
   "opponent_habits": {
-    "tech_roll_away": 1072,
-    "tech_roll_in": 743,
-    "tech_in_place": 303,
-    "missed_tech": 2060,
-    "ledge_attack_freq": 506,
-    "ledge_roll_freq": 463,
+    "tech_roll_away": 1144,
+    "tech_roll_in": 782,
+    "tech_in_place": 321,
+    "missed_tech": 2193,
+    "ledge_attack_freq": 528,
+    "ledge_roll_freq": 503,
     "ledge_jump_freq": 26,
-    "ledge_getup_freq": 5,
-    "shield_habit": 1.5353122143764033e-07,
-    "cqc_attack_freq": 2191,
-    "cqc_shield_freq": 184,
+    "ledge_getup_freq": 6,
+    "shield_habit": 2.0451268821326088e-05,
+    "cqc_attack_freq": 2342,
+    "cqc_shield_freq": 189,
     "cqc_roll_freq": 0,
-    "jump_after_hitstun": 105
+    "jump_after_hitstun": 118
   },
   "learned_errors": {
-    "offstage_falls": 262,
-    "damage_absorbed": 34405.88213145733,
+    "offstage_falls": 270,
+    "damage_absorbed": 35049.4721506834,
     "shield_breaks": 0,
-    "grabbed_in_neutral": 193
+    "grabbed_in_neutral": 198
   }
 }

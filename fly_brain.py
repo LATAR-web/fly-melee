@@ -654,6 +654,11 @@ class FlyBrain:
         self.grab_pummel_count = 0
         self.jab_reset_active = False
         self.jab_reset_frame = -100
+        self.whiff_punish_state = None
+        self.whiff_punish_frame = -100
+        self.chaingrab_count = 0
+        self.luigi_ledge_state = None
+        self.luigi_ledge_timer = 0
 
     def _set_luigi_jump(self, action_name, current_frame):
         """Registra la acción aérea en cola y el frame en que se inició para ejecución inmediata al despegar."""
@@ -1162,6 +1167,17 @@ class FlyBrain:
                 "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
+        # HUMILLACIÓN 20XX: Disrespect a rival cayendo al abismo sin retorno
+        opp_pct = float(getattr(opponent, "percent", 0.0))
+        if opp_offstage and oy < -10.0 and opp_pct >= 55.0 and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
+            flex_shine = (current_frame % 4 == 0)
+            teabag_y = 0.0 if (current_frame % 4 < 2) else 0.5
+            return self._enforce_safety({
+                "name": "🦊 HUMILLACIÓN 20XX: RAPID TEABAG / MULTI-SHINE FLEX",
+                "jump": False, "attack": False, "special": flex_shine, "shield": False, "grab": False,
+                "stick_x": 0.5, "stick_y": 0.0 if flex_shine else teabag_y, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
         # =========================================================================
         # 1. HITSTUN, DAÑO, TUMBLE & TECHING (RECUPERACIÓN INSTANTÁNEA TRAS GOLPES)
         # =========================================================================
@@ -1506,9 +1522,17 @@ class FlyBrain:
                     "_allow_air_shield": True, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-        # COMBO ESPECÍFICO: DRILL-SMASH (D-Air -> JC Up-Smash True Combo)
+        # COMBO ESPECÍFICO: DRILL-SMASH & DRILL-SHINE SHIELD PRESSURE
         if getattr(self, "drill_smash_state", None) in ["DRILL_ACTIVE", "DRILL_LANDED"] and getattr(player, "on_ground", True):
             self.drill_smash_state = None
+            is_shield_opp = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
+            if is_shield_opp:
+                self.learn_from_success("SHIELD_PUNISH")
+                return self._enforce_safety({
+                    "name": "🦊 DRILL-SHINE SHIELD PRESSURE: FRAME-1 SHINE POKE",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
             self.learn_from_success("DRILL_SMASH")
             self.dopamine = min(1.0, self.dopamine + 0.55)
             self.combo_count += 2
@@ -2284,6 +2308,17 @@ class FlyBrain:
                 "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
+        # HUMILLACIÓN 20XX: Disrespect a rival cayendo al abismo sin retorno
+        opp_pct = float(getattr(opponent, "percent", 0.0))
+        if opp_offstage and oy < -10.0 and opp_pct >= 55.0 and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
+            teabag_y = 0.0 if (current_frame % 4 < 2) else 0.5
+            teabag_taunt = (current_frame % 20 == 0) and self.dopamine > 0.60
+            return self._enforce_safety({
+                "name": "👟 HUMILLACIÓN 20XX: RAPID TEABAG DISRESPECT (SPAM ABAJO)",
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": teabag_taunt,
+                "stick_x": 0.5, "stick_y": teabag_y, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+            }, player, opponent, stage_edge=stage_edge)
+
         # Detección de repisa y offstage para todo el árbol de decisiones
         is_on_ledge = act_val in [252, 253] or any(k in act_str for k in ["EDGE_CATCHING", "EDGE_HANGING"])
         is_offstage = is_on_ledge or ((not getattr(player, "on_ground", True)) and (
@@ -2356,16 +2391,27 @@ class FlyBrain:
             if is_on_ledge:
                 dist_to_opp = math.hypot(ox - px, oy - py)
                 if dist_to_opp <= 14.0 or (ox * px > 0 and abs(ox) > (stage_edge - 15.0)):
+                    self.luigi_ledge_state = None
                     return {
                         "name": "⚡ SUBIDA INVULNERABLE: LEDGE ROLL (ATRAVESAR AL RIVAL)",
                         "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
                         "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }
-                return {
-                    "name": "⚡ LEDGEDASH LUIGI: SUBIDA CON WAVEDASH DESLIZANTE",
-                    "jump": True, "attack": False, "special": False, "shield": True, "grab": False,
-                    "stick_x": float(dir_to_stage), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }
+                if getattr(self, "luigi_ledge_state", None) == "LEDGEDASH_AIR":
+                    self.luigi_ledge_state = None
+                    return {
+                        "name": "⚡ LEDGEDASH LUIGI: WAVELAND INVENCIBLE EN ESCENARIO (0.005 TRACTION)",
+                        "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                        "stick_x": float(dir_to_stage), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "_allow_air_shield": True, "stats": stats
+                    }
+                else:
+                    self.luigi_ledge_state = "LEDGEDASH_AIR"
+                    return {
+                        "name": "⚡ LEDGEDASH LUIGI: SUBIDA CON WAVEDASH DESLIZANTE",
+                        "jump": True, "attack": False, "special": False, "shield": True, "grab": False,
+                        "stick_x": float(dir_to_stage), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }
 
             # Si Luigi está DEBAJO de la plataforma: CURVAR HACIA AFUERA
             if is_under_stage:
@@ -2613,6 +2659,18 @@ class FlyBrain:
         if self.combo_state == "LUIGI_DTHROW_COMBO" or is_throw_down:
             self.combo_timer += 1
             if getattr(player, "on_ground", True):
+                # CHAINGRAB 20XX CONTRA FASTFALLERS (FOX, FALCO, FALCON) A BAJO % (<40%)
+                if archetype == "FASTFALLER" and opp_pct < 40.0 and dist <= 13.0 and getattr(self, "chaingrab_count", 0) < 3:
+                    self.chaingrab_count = getattr(self, "chaingrab_count", 0) + 1
+                    self.combo_count += 1
+                    self.dopamine = min(1.0, self.dopamine + 0.25)
+                    self.learn_from_success("GRAB_COMBO")
+                    return self._enforce_safety({
+                        "name": f"🤼 CHAINGRAB 20XX: WAVEDASH ADELANTE ➔ REGRAB (FASTFALLER TRAP {self.chaingrab_count}/3)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": True,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
                 combo_mastery = self.get_plasticity("combo_mastery", 1.40)
                 # TIER 3: DOPAMINA ALTA (>0.75) O ALTA MAESTRÍA APRENDIDA -> THE LEGENDARY SHORYUKEN (SWEETSPOT UP-B)
                 can_shoryuken = (self.dopamine > 0.75 and (45.0 <= opp_pct <= 115.0) and dist <= 6.5) or \
@@ -3268,7 +3326,27 @@ class FlyBrain:
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            # 3. DEFENSIVA: CROUCH-CANCEL SWEETSPOT UP-B SHORYUKEN COUNTER (Reversal Letal con Fuego)
+            # 3. DEFENSIVA: VIST WHIFF PUNISH O CROUCH-CANCEL SWEETSPOT UP-B SHORYUKEN COUNTER
+            is_whiff_ready = (getattr(self, "whiff_punish_state", None) == "PUNISH_READY") and (current_frame - getattr(self, "whiff_punish_frame", -100) <= 12)
+            if is_whiff_ready:
+                self.whiff_punish_state = None
+                if (opp_pct >= 38.0 or self.dopamine > 0.55) and dist <= 7.0:
+                    self.last_luigi_power = "UPB_SHORYUKEN"
+                    self.dopamine = 1.0
+                    self.learn_from_success("KO")
+                    return self._enforce_safety({
+                        "name": "💥 VIST WHIFF PUNISH: SWEETSPOT UP-B SHORYUKEN (PING! HUMILLACIÓN TOTAL)",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    self.learn_from_success("COMBO")
+                    return self._enforce_safety({
+                        "name": "💥 VIST WHIFF PUNISH: F-SMASH DIAGONAL DEMOLEDOR",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.70, "c_stick_x": float(towards_opp), "c_stick_y": 0.70, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
             if is_opp_attacking:
                 cqc_reflex = self.get_plasticity("cqc_counter_reflex", 1.50)
                 cc_shoryu_limit = min(95.0, 75.0 * (cqc_reflex / 1.50))
@@ -3281,12 +3359,23 @@ class FlyBrain:
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                elif getattr(player, "percent", 0.0) < cc_dsmash_limit:
+                elif dist <= 5.5 and getattr(player, "percent", 0.0) < cc_dsmash_limit:
                     self.learn_from_success("CQC_COUNTER")
                     return self._enforce_safety({
                         "name": "🟢 CQC: CROUCH-CANCEL FRAME-5 DOWN-SMASH COUNTER",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                elif dist > 5.5 and abs(px) < (stage_edge - 14.0):
+                    self.whiff_punish_state = "PUNISH_READY"
+                    self.whiff_punish_frame = current_frame
+                    self.luigi_jump_action = "WAVEDASH_BACK"
+                    self.luigi_wd_dir = 1.0 - towards_opp
+                    self.luigi_jump_frame = current_frame
+                    return self._enforce_safety({
+                        "name": "⚡ VIST WAVEDASH-BACK BAIT: MICROCANCEL FUERA DE ALCANCE",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 else:
                     return self._enforce_safety({
@@ -3337,6 +3426,28 @@ class FlyBrain:
         # 11. NEUTRAL TÁCTICO: PODERES, ATAQUES AÉREOS & WAVEDASHING (11.0 < dist <= 24.0 u)
         # =========================================================================
         elif dist <= 24.0:
+            # 0. WHIFF PUNISH VIST: Si el rival está atacando al aire a distancia de whiff (11.0 < dist <= 14.5)
+            if is_opp_attacking and dist <= 14.5 and getattr(player, "on_ground", True):
+                is_ready = (getattr(self, "whiff_punish_state", None) == "PUNISH_READY") and (current_frame - getattr(self, "whiff_punish_frame", -100) <= 12)
+                if is_ready:
+                    self.whiff_punish_state = None
+                    return self._enforce_safety({
+                        "name": "💥 VIST WHIFF PUNISH: F-SMASH DIAGONAL DEMOLEDOR",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.70, "c_stick_x": float(towards_opp), "c_stick_y": 0.70, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                elif abs(px) < (stage_edge - 14.0):
+                    self.whiff_punish_state = "PUNISH_READY"
+                    self.whiff_punish_frame = current_frame
+                    self.luigi_jump_action = "WAVEDASH_BACK"
+                    self.luigi_wd_dir = 1.0 - towards_opp
+                    self.luigi_jump_frame = current_frame
+                    return self._enforce_safety({
+                        "name": "⚡ VIST WAVEDASH-BACK BAIT: MICROCANCEL FUERA DE ALCANCE",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
             cx_spikes = int(self.spikes[self.map_cx_saccade].sum()) if hasattr(self, "map_cx_saccade") else 0
             entropy = (current_frame * 17 + cx_spikes * 7 + int(self.dopamine * 100)) % 100
 
