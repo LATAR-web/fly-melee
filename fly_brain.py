@@ -564,6 +564,26 @@ class FlyBrain:
             self.map_laser_zoning     = np.arange(0, min(8000, n_base), dtype=np.int32)
             self.map_cqc_counter      = np.arange(0, min(8000, n_base), dtype=np.int32)
             self.map_cx_saccade       = np.arange(0, min(14000, n_base), dtype=np.int32)
+            # Mapeos complementarios para modo ligero
+            self.map_vis_left_retina  = np.arange(0, min(5000, n_base), dtype=np.int32)
+            self.map_vis_right_retina = np.arange(min(5000, n_base), min(10000, n_base), dtype=np.int32)
+            self.map_vis_left_looming = np.arange(min(10000, n_base), min(15000, n_base), dtype=np.int32)
+            self.map_vis_right_looming= np.arange(min(15000, n_base), min(20000, n_base), dtype=np.int32)
+            self.map_vis_left_motion  = np.arange(min(20000, n_base), min(25000, n_base), dtype=np.int32)
+            self.map_vis_right_motion = np.arange(min(25000, n_base), min(30000, n_base), dtype=np.int32)
+            self.map_mech_hitlag      = np.arange(0, min(5000, n_base), dtype=np.int32)
+            self.map_mech_shield_stun = np.arange(min(5000, n_base), min(10000, n_base), dtype=np.int32)
+            self.map_mech_tumble      = np.arange(min(10000, n_base), min(15000, n_base), dtype=np.int32)
+            self.map_mech_grab        = np.arange(min(15000, n_base), min(20000, n_base), dtype=np.int32)
+            self.map_ppl1             = np.arange(min(20000, n_base), min(25000, n_base), dtype=np.int32)
+            self.map_cx_compass       = np.arange(min(25000, n_base), min(30000, n_base), dtype=np.int32)
+            self.map_c_stick          = np.arange(min(30000, n_base), min(35000, n_base), dtype=np.int32)
+            self.map_sdi_quantum      = np.arange(min(35000, n_base), min(40000, n_base), dtype=np.int32)
+            self.map_powershield      = np.arange(min(40000, n_base), min(45000, n_base), dtype=np.int32)
+            self.map_shield_drop      = np.arange(min(45000, n_base), n_base, dtype=np.int32)
+            self.map_edge_cancel      = np.arange(0, min(5000, n_base), dtype=np.int32)
+            self.map_tech_chase       = np.arange(min(5000, n_base), min(15000, n_base), dtype=np.int32)
+            self.map_edgeguard_predator = np.arange(min(15000, n_base), min(25000, n_base), dtype=np.int32)
             return
 
         self.num_neurons = 8 * n_base # 395,144 neuronas biológicas (~400k)
@@ -600,47 +620,71 @@ class FlyBrain:
         sens_c1 = (in_indices + n_base).copy()
         self.sensory_neurons = np.concatenate([sens_c0, sens_c1])
         
-        # Motor en Cluster 4 (VNC Motor 197k - 246k)
-        vnc_offset = 4 * n_base
-        dn_in_vnc = [min(vnc_offset + (idx % n_base), self.num_neurons - 1) for idx in dn_indices]
+        # =========================================================================
+        # ARQUITECTURA INTEGRAL DEL CONECTOMA BIOLÓGICO (395,144 NEURONAS EN 8 CLUSTERS)
+        # 100% DE LAS NEURONAS MAPDEADAS EN REDES FISIOLÓGICAS ACTIVAS
+        # =========================================================================
+        # Cluster 0 (0 .. 49,392): Lóbulo Óptico Izquierdo (Visión Retinotópica & Looming)
+        c0 = 0
+        self.map_vis_left_retina    = np.arange(c0, c0 + 20000, dtype=np.int32)
+        self.map_vis_left_looming   = np.arange(c0 + 20000, c0 + 35000, dtype=np.int32)
+        self.map_vis_left_motion    = np.arange(c0 + 35000, c0 + n_base, dtype=np.int32)
+
+        # Cluster 1 (49,393 .. 98,785): Lóbulo Óptico Derecho (Visión & Detección de Proyectiles)
+        c1 = 1 * n_base
+        self.map_vis_right_retina   = np.arange(c1, c1 + 20000, dtype=np.int32)
+        self.map_vis_right_looming  = np.arange(c1 + 20000, c1 + 35000, dtype=np.int32)
+        self.map_vis_right_motion   = np.arange(c1 + 35000, c1 + n_base, dtype=np.int32)
+
+        # Cluster 2 (98,786 .. 148,178): Mecanosensorial & Antenal (Hitlag, Escudo, Tumble, Grab)
+        c2 = 2 * n_base
+        self.map_mech_hitlag        = np.arange(c2, c2 + 13000, dtype=np.int32)
+        self.map_mech_shield_stun   = np.arange(c2 + 13000, c2 + 25000, dtype=np.int32)
+        self.map_mech_tumble        = np.arange(c2 + 25000, c2 + 37000, dtype=np.int32)
+        self.map_mech_grab          = np.arange(c2 + 37000, c2 + n_base, dtype=np.int32)
+
+        # Cluster 3 (148,179 .. 197,571): Complejo Central & Núcleos Neuromoduladores PAM/PPL1
+        c3 = 3 * n_base
+        self.map_pam                = np.arange(c3, c3 + 16000, dtype=np.int32)          # Dopamina PAM (Predador / Recompensa)
+        self.map_ppl1               = np.arange(c3 + 16000, c3 + 30000, dtype=np.int32)  # Octopamina PPL1 (Alerta / Estrés)
+        self.map_cx_compass         = np.arange(c3 + 30000, c3 + n_base, dtype=np.int32) # Brújula espacial 360° (Posición de Escenario)
+
+        # Cluster 4 (197,572 .. 246,964): Cordón Nervioso Ventral (VNC Motor & Premotor)
+        c4 = 4 * n_base
+        dn_in_vnc = [min(c4 + (idx % n_base), self.num_neurons - 1) for idx in dn_indices]
         self.dn_neurons = np.array(dn_in_vnc, dtype=np.int32)
-        
         n_dns = len(self.dn_neurons)
         split = max(1, n_dns // 6)
-        self.map_jump    = self.dn_neurons[0 : split]            # Reflejo Giant Fiber / DNp01
-        self.map_attack  = self.dn_neurons[split : 2*split]      # Motor Ataque / Smashes
-        self.map_special = self.dn_neurons[2*split : 3*split]    # Reflector Shine / Blaster
-        self.map_shield  = self.dn_neurons[3*split : 4*split]    # Escudo / Teching / L-Cancel
-        self.map_left    = self.dn_neurons[4*split : 5*split]    # Movimiento Izquierda
-        self.map_right   = self.dn_neurons[5*split :]            # Movimiento Derecha
-        
-        # Red de Escape de Emergencia Giant Fiber (Cluster 5: 246k - 296k)
-        gf_offset = 5 * n_base
-        self.map_gf      = np.arange(gf_offset, gf_offset + 12000, dtype=np.int32)
+        self.map_jump               = np.arange(c4, c4 + 8000, dtype=np.int32)
+        self.map_attack             = np.arange(c4 + 8000, c4 + 16000, dtype=np.int32)
+        self.map_special            = np.arange(c4 + 16000, c4 + 24000, dtype=np.int32)
+        self.map_shield             = np.arange(c4 + 24000, c4 + 32000, dtype=np.int32)
+        self.map_left               = np.arange(c4 + 32000, c4 + 40000, dtype=np.int32)
+        self.map_right              = np.arange(c4 + 40000, c4 + 46000, dtype=np.int32)
+        self.map_c_stick            = np.arange(c4 + 46000, c4 + n_base, dtype=np.int32)
+        self.map_laser_zoning       = np.arange(c4 + 20000, c4 + 24000, dtype=np.int32) # Subred SHDL
 
-        # Red Cerebelar de Combos y Tech-Chase (Cluster 7: 345k - 395k)
-        combo_offset = 7 * n_base
-        self.map_combo   = np.arange(combo_offset, min(combo_offset + 16000, self.num_neurons), dtype=np.int32)
-        
-        # Red Dopaminérgica PAM (Cluster 3: 148k - 197k)
-        pam_offset = 3 * n_base
-        self.map_pam     = np.arange(pam_offset, pam_offset + 12000, dtype=np.int32)
+        # Cluster 5 (246,965 .. 296,357): Giant Fiber (DNp01), SDI Cuántico & Evasión Saccádica
+        c5 = 5 * n_base
+        self.map_gf                 = np.arange(c5, c5 + 16000, dtype=np.int32)          # Escape Giant Fiber
+        self.map_sdi_quantum        = np.arange(c5 + 16000, c5 + 32000, dtype=np.int32)  # Vectores SDI Cuántico
+        self.map_cx_saccade         = np.arange(c5 + 32000, c5 + n_base, dtype=np.int32)  # Saccades & Mixups 20XX
 
-        # Circuitos Neuronales Especializados del Arsenal Competitivo 20XX:
-        # 1. Red Cerebelar de Combos Verticales y Fastfallers (Cluster 7: 345k - 361k)
-        self.map_combo_fastfaller = np.arange(combo_offset, min(combo_offset + 8000, self.num_neurons), dtype=np.int32)
-        # 2. Red de Kill Confirms Anti-Floaty (Cluster 7: 361k - 377k)
-        self.map_combo_floaty     = np.arange(combo_offset + 8000, min(combo_offset + 16000, self.num_neurons), dtype=np.int32)
-        # 3. Red de Asalto y Control de Plataformas (Cluster 6: 296k - 312k)
-        prec_offset = 6 * n_base
-        self.map_platform_shark   = np.arange(prec_offset, min(prec_offset + 8000, self.num_neurons), dtype=np.int32)
-        # 4. Red de Zoning SHDL y Blaster (Cluster 4: 210k - 225k)
-        self.map_laser_zoning     = np.arange(vnc_offset + 12000, min(vnc_offset + 20000, self.num_neurons), dtype=np.int32)
-        # 5. Red de Crouch-Cancel y Shine Counter CQC (Cluster 6: 312k - 328k)
-        self.map_cqc_counter      = np.arange(prec_offset + 8000, min(prec_offset + 16000, self.num_neurons), dtype=np.int32)
-        # 6. Red de Evasión y Saccades del Central Complex (Cluster 5: 246k - 262k - Movilidad Impredecible 20XX)
-        cx_offset = 5 * n_base
-        self.map_cx_saccade       = np.arange(cx_offset, min(cx_offset + 14000, self.num_neurons), dtype=np.int32)
+        # Cluster 6 (296,358 .. 345,750): VNC de Precisión 20XX (Powershield, Shield Drop, Edge-Cancel, CQC)
+        c6 = 6 * n_base
+        self.map_powershield        = np.arange(c6, c6 + 12000, dtype=np.int32)
+        self.map_shield_drop        = np.arange(c6 + 12000, c6 + 24000, dtype=np.int32)
+        self.map_edge_cancel        = np.arange(c6 + 24000, c6 + 36000, dtype=np.int32)
+        self.map_cqc_counter        = np.arange(c6 + 36000, c6 + n_base, dtype=np.int32)
+        self.map_platform_shark     = self.map_shield_drop  # Alias retrocompatible
+
+        # Cluster 7 (345,751 .. 395,143): Red Cerebelar de Combos, Tech-Chase & Predator
+        c7 = 7 * n_base
+        self.map_combo              = np.arange(c7, c7 + 16000, dtype=np.int32)
+        self.map_combo_fastfaller   = np.arange(c7, c7 + 8000, dtype=np.int32)
+        self.map_combo_floaty       = np.arange(c7 + 8000, c7 + 16000, dtype=np.int32)
+        self.map_tech_chase         = np.arange(c7 + 16000, c7 + 28000, dtype=np.int32)
+        self.map_edgeguard_predator = np.arange(c7 + 28000, c7 + n_base, dtype=np.int32)
 
     def reset(self):
         """Reinicia los potenciales de membrana, el estado de la red y los neuromoduladores."""
@@ -849,22 +893,65 @@ class FlyBrain:
         input_current[sens_left]  += (base_threat + left_stim + looming_stim)
         input_current[sens_right] += (base_threat + right_stim + looming_stim)
         
-        # Modulación neuromoduladora en subpoblaciones biológicas fisiológicas
+        # Clusters 0 y 1: Lóbulos Ópticos Izquierdo y Derecho (Visión Retinotópica & Looming)
+        if hasattr(self, "map_vis_left_retina"):
+            if rel_x < 0:
+                input_current[self.map_vis_left_retina[:800]] += left_stim
+                input_current[self.map_vis_left_motion[:600]] += left_stim * 0.8
+            else:
+                input_current[self.map_vis_right_retina[:800]] += right_stim
+                input_current[self.map_vis_right_motion[:600]] += right_stim * 0.8
+            if looming_rate > 0:
+                input_current[self.map_vis_left_looming[:600]]  += looming_stim
+                input_current[self.map_vis_right_looming[:600]] += looming_stim
+
+        # Cluster 2: Mecanosensorial & Antenal (Hitlag, Escudo, Tumble, Grab)
+        if player is not None and hasattr(self, "map_mech_hitlag"):
+            hitstun = getattr(player, "hitstun_frames_left", 0)
+            if hitstun > 0:
+                input_current[self.map_mech_hitlag[:800]] += 4.5 + min(3.0, hitstun * 0.1)
+            p1_act_val = getattr(player.action, "value", getattr(player, "act_val", 0))
+            p1_act_str = str(getattr(player, "action", ""))
+            if p1_act_val in [178, 179, 180, 181] or "SHIELD" in p1_act_str:
+                input_current[self.map_mech_shield_stun[:700]] += 4.0
+            if p1_act_val in [25, 26, 27, 28] or "TUMBLE" in p1_act_str or "DAMAGE" in p1_act_str:
+                input_current[self.map_mech_tumble[:700]] += 4.8
+            if is_p1_grabbed:
+                input_current[self.map_mech_grab[:900]] += 6.0
+
+        # Cluster 3: Complejo Central (CX) & Neuromoduladores PAM/PPL1
         dopamine_gain = self.dopamine * 2.5
+        octopamine_gain = self.octopamine * 2.2
+        input_current[self.map_pam[:700]] += self.dopamine * 2.0
+        if hasattr(self, "map_ppl1"):
+            input_current[self.map_ppl1[:700]] += octopamine_gain
+        if player is not None and hasattr(self, "map_cx_compass"):
+            px_val = getattr(player.position, "x", 0.0)
+            edge_dist = 68.4 - abs(px_val)
+            compass_val = 3.0 if edge_dist < 18.0 else 1.5
+            input_current[self.map_cx_compass[:700]] += compass_val
+
+        # Cluster 4: Cordón Nervioso Ventral (VNC Motor & Premotor)
         input_current[self.map_attack[:600]]  += dopamine_gain
         input_current[self.map_special[:600]] += dopamine_gain * 0.9
-        input_current[self.map_combo[:800]]   += dopamine_gain * 1.5
-        input_current[self.map_pam[:600]]     += self.dopamine * 2.0
-        
-        octopamine_gain = self.octopamine * 2.2
         input_current[self.map_jump[:600]]    += octopamine_gain
         input_current[self.map_shield[:600]]  += octopamine_gain * 0.9
-        
+        if rel_x < 0:
+            input_current[self.map_left[:600]]  += 3.0
+        else:
+            input_current[self.map_right[:600]] += 3.0
+
+        # Cluster 5: Giant Fiber (DNp01), SDI Cuántico & Saccades 20XX
         if is_offstage:
             input_current[self.map_jump[:800]] += 4.5
-            input_current[self.map_gf[:800]]   += 5.5 # Activación rápida de la Giant Fiber de escape
+            input_current[self.map_gf[:800]]   += 5.5
+        if player is not None and getattr(player, "hitstun_frames_left", 0) > 0 and hasattr(self, "map_sdi_quantum"):
+            input_current[self.map_sdi_quantum[:800]] += 5.0
+        input_current[self.map_cx_saccade[:800]] += 4.2 * (self.dopamine + 0.4)
 
-        # Inyección sensorial en circuitos especializados del Arsenal 20XX
+        # Clusters 6 y 7: Precisión 20XX y Combos Cerebelares
+        input_current[self.map_combo[:800]] += dopamine_gain * 1.5
+
         if opponent is not None:
             char_archetype = BattlefieldMap.get_character_archetype(getattr(opponent, "character", None))
             ox_val = getattr(opponent.position, "x", 0.0)
@@ -872,22 +959,32 @@ class FlyBrain:
             px_val = getattr(player.position, "x", 0.0) if player else 0.0
             py_val = getattr(player.position, "y", 0.0) if player else 0.0
             dist_val = math.hypot(ox_val - px_val, oy_val - py_val)
+            opp_act_str = str(getattr(opponent, "action", ""))
+            opp_act_val = getattr(opponent.action, "value", getattr(opponent, "act_val", 0))
 
-            if char_archetype == "FASTFALLER":
-                input_current[self.map_combo_fastfaller[:600]] += 3.5
-            elif char_archetype == "FLOATY":
-                input_current[self.map_combo_floaty[:600]] += 3.5
-
-            if BattlefieldMap.is_on_platform(ox_val, oy_val) is not None:
+            # Cluster 6 (Powershield, Shield Drop, Edge-Cancel, CQC)
+            is_projectile = any(k in opp_act_str for k in ["LASER", "BLASTER", "MISSILE", "SPECIAL_N", "SPECIAL_S", "ITEM_THROW", "PILL", "TURNIP", "CHARGE_SHOT"]) or (opp_act_val in [341, 342, 343, 344, 345, 348, 349, 350])
+            if is_projectile and hasattr(self, "map_powershield"):
+                input_current[self.map_powershield[:800]] += 5.5
+            if BattlefieldMap.is_on_platform(px_val, py_val - 3.0) is not None:
+                if hasattr(self, "map_shield_drop"):
+                    input_current[self.map_shield_drop[:600]] += 4.0
+                    input_current[self.map_edge_cancel[:600]] += 4.0
                 input_current[self.map_platform_shark[:600]] += 4.0
-
             if dist_val > 28.0:
                 input_current[self.map_laser_zoning[:600]] += 3.0
             elif dist_val <= 10.0:
                 input_current[self.map_cqc_counter[:600]] += 3.5
-            else:
-                # Neutral spacing: estimular el Central Complex para saccades y movilidad 20XX
-                input_current[self.map_cx_saccade[:800]] += 4.2 * (self.dopamine + 0.4)
+
+            # Cluster 7 (Combos, Tech-Chase, Predator)
+            if char_archetype == "FASTFALLER":
+                input_current[self.map_combo_fastfaller[:600]] += 3.5
+            elif char_archetype == "FLOATY":
+                input_current[self.map_combo_floaty[:600]] += 3.5
+            if ((opp_act_val in range(183, 205)) or ("DOWN" in opp_act_str)) and hasattr(self, "map_tech_chase"):
+                input_current[self.map_tech_chase[:800]] += 4.5
+            if (getattr(opponent, "off_stage", False) or abs(ox_val) > 68.4) and hasattr(self, "map_edgeguard_predator"):
+                input_current[self.map_edgeguard_predator[:800]] += 5.0
             
         return input_current
 
@@ -1082,6 +1179,16 @@ class FlyBrain:
            - Tech-chase con Down-Smash semi-spike.
            - Short-Hop Laser pressure a larga distancia.
         """
+        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS)
+        spikes_c0_c1   = int(np.sum(self.spikes[self.map_vis_left_retina]) + np.sum(self.spikes[self.map_vis_right_retina])) if hasattr(self, "map_vis_left_retina") else 0
+        spikes_c2      = int(np.sum(self.spikes[self.map_mech_hitlag]) + np.sum(self.spikes[self.map_mech_shield_stun])) if hasattr(self, "map_mech_hitlag") else 0
+        spikes_c3      = int(np.sum(self.spikes[self.map_pam]) + np.sum(self.spikes[self.map_ppl1])) if hasattr(self, "map_ppl1") else int(np.sum(self.spikes[self.map_pam]))
+        spikes_c4      = int(np.sum(self.spikes[self.map_attack]) + np.sum(self.spikes[self.map_special]))
+        spikes_c5      = int(np.sum(self.spikes[self.map_gf]) + np.sum(self.spikes[self.map_cx_saccade]))
+        spikes_c6      = int(np.sum(self.spikes[self.map_powershield]) + np.sum(self.spikes[self.map_cqc_counter])) if hasattr(self, "map_powershield") else int(np.sum(self.spikes[self.map_cqc_counter]))
+        spikes_c7      = int(np.sum(self.spikes[self.map_combo]) + np.sum(self.spikes[self.map_combo_fastfaller]))
+        total_spikes   = int(np.sum(self.spikes))
+
         jump_spikes    = int(np.sum(self.spikes[self.map_jump]))
         attack_spikes  = int(np.sum(self.spikes[self.map_attack]))
         special_spikes = int(np.sum(self.spikes[self.map_special]))
@@ -1090,12 +1197,21 @@ class FlyBrain:
         gf_spikes      = int(np.sum(self.spikes[self.map_gf]))
         left_spikes    = int(np.sum(self.spikes[self.map_left]))
         right_spikes   = int(np.sum(self.spikes[self.map_right]))
-        total_spikes   = int(np.sum(self.spikes))
         
         stage_edge = get_stage_edge(stage)
         
         stats = {
             "total_spikes": total_spikes,
+            "neural_activation": f"{(total_spikes / max(1, self.num_neurons)) * 100:.2f}%",
+            "cluster_activity": {
+                "C0_C1_Visual": spikes_c0_c1,
+                "C2_Mechanosensory": spikes_c2,
+                "C3_Central_Complex": spikes_c3,
+                "C4_VNC_Motor": spikes_c4,
+                "C5_Giant_Fiber_SDI": spikes_c5,
+                "C6_Precision_20XX": spikes_c6,
+                "C7_Cerebellar_Combos": spikes_c7
+            },
             "jump_p": jump_spikes,
             "attack_p": attack_spikes,
             "special_p": special_spikes,
@@ -1105,7 +1221,8 @@ class FlyBrain:
             "dopamine": round(float(self.dopamine), 2),
             "octopamine": round(float(self.octopamine), 2),
             "combo_count": self.combo_count,
-            "stage_edge": stage_edge
+            "stage_edge": stage_edge,
+            "character": "FOX"
         }
         
         # =========================================================================
@@ -2320,11 +2437,36 @@ class FlyBrain:
         """
         stage_edge = BattlefieldMap.get_edge(stage)
         
-        # Extracción segura de telemetría y neuronas motoras
+        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS)
+        spikes_c0_c1   = int(np.sum(self.spikes[self.map_vis_left_retina]) + np.sum(self.spikes[self.map_vis_right_retina])) if hasattr(self, "map_vis_left_retina") else 0
+        spikes_c2      = int(np.sum(self.spikes[self.map_mech_hitlag]) + np.sum(self.spikes[self.map_mech_shield_stun])) if hasattr(self, "map_mech_hitlag") else 0
+        spikes_c3      = int(np.sum(self.spikes[self.map_pam]) + np.sum(self.spikes[self.map_ppl1])) if hasattr(self, "map_ppl1") else int(np.sum(self.spikes[self.map_pam]))
+        spikes_c4      = int(np.sum(self.spikes[self.map_attack]) + np.sum(self.spikes[self.map_special]))
+        spikes_c5      = int(np.sum(self.spikes[self.map_gf]) + np.sum(self.spikes[self.map_cx_saccade]))
+        spikes_c6      = int(np.sum(self.spikes[self.map_powershield]) + np.sum(self.spikes[self.map_cqc_counter])) if hasattr(self, "map_powershield") else int(np.sum(self.spikes[self.map_cqc_counter]))
+        spikes_c7      = int(np.sum(self.spikes[self.map_combo]) + np.sum(self.spikes[self.map_combo_fastfaller]))
+        total_spikes   = int(np.sum(self.spikes))
+
         stats = {
             "dopamine": float(self.dopamine),
             "octopamine": float(self.octopamine),
-            "total_spikes": int(self.spikes.sum()),
+            "total_spikes": total_spikes,
+            "neural_activation": f"{(total_spikes / max(1, self.num_neurons)) * 100:.2f}%",
+            "cluster_activity": {
+                "C0_C1_Visual": spikes_c0_c1,
+                "C2_Mechanosensory": spikes_c2,
+                "C3_Central_Complex": spikes_c3,
+                "C4_VNC_Motor": spikes_c4,
+                "C5_Giant_Fiber_SDI": spikes_c5,
+                "C6_Precision_20XX": spikes_c6,
+                "C7_Cerebellar_Combos": spikes_c7
+            },
+            "jump_p": int(np.sum(self.spikes[self.map_jump])),
+            "attack_p": int(np.sum(self.spikes[self.map_attack])),
+            "special_p": int(np.sum(self.spikes[self.map_special])),
+            "shield_p": int(np.sum(self.spikes[self.map_shield])),
+            "combo_p": int(np.sum(self.spikes[self.map_combo])),
+            "gf_p": int(np.sum(self.spikes[self.map_gf])),
             "character": "LUIGI"
         }
 
