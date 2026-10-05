@@ -1,0 +1,19 @@
+# ==============================================================================
+# Fly-Melee: Conectoma de la Mosca (400k) × Super Smash Bros. Melee
+# Dependencias de Python
+# ==============================================================================
+
+# Computación científica y álgebra lineal para la simulación neural LIF
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Protocolo Slippi y comunicación con Dolphin para Super Smash Bros. Melee
+melee>=0.47.0
+pyenet-vladfi>=1.3.19
+py-ubjson>=0.16.1
+
+# Detección y calibración de mandos (GameCube, Xbox, PlayStation, Bluetooth) en Linux
+evdev>=1.6.0
+
+# Opcional: PyTorch para aceleración matricial o entrenamiento profundo
+# torch>=2.0.0

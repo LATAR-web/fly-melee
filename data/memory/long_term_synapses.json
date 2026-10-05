@@ -1,10 +1,10 @@
 {
   "version": 1.1,
   "matches_played": 1789,
-  "matches_won": 1714,
-  "total_kos": 4864,
+  "matches_won": 1716,
+  "total_kos": 4874,
   "total_deaths": 274,
-  "total_combos": 10429,
+  "total_combos": 10431,
   "edge_fear": 1.05,
   "synaptic_plasticity": {
     "combo_mastery": 3.2399999999999998,
@@ -27,16 +27,16 @@
     "tech_roll_away": 1144,
     "tech_roll_in": 782,
     "tech_in_place": 321,
-    "missed_tech": 2193,
-    "ledge_attack_freq": 528,
+    "missed_tech": 2221,
+    "ledge_attack_freq": 530,
     "ledge_roll_freq": 503,
     "ledge_jump_freq": 26,
     "ledge_getup_freq": 6,
-    "shield_habit": 2.0451268821326088e-05,
-    "cqc_attack_freq": 2342,
+    "shield_habit": 5.1789817623070185e-06,
+    "cqc_attack_freq": 2358,
     "cqc_shield_freq": 189,
     "cqc_roll_freq": 0,
-    "jump_after_hitstun": 118
+    "jump_after_hitstun": 122
   },
   "learned_errors": {
     "offstage_falls": 270,

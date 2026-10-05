@@ -9,9 +9,12 @@ import os
 try:
     import numpy as np
 except ImportError:
-    venv_python = "/home/ltar/.venvs/pytorch/bin/python"
-    if os.path.exists(venv_python) and sys.executable != venv_python:
-        os.execv(venv_python, [venv_python] + sys.argv)
+    for venv_python in [
+        os.path.join(os.path.dirname(__file__), ".venv", "bin", "python"),
+        "/home/ltar/.venvs/pytorch/bin/python",
+    ]:
+        if os.path.exists(venv_python) and sys.executable != venv_python:
+            os.execv(venv_python, [venv_python] + sys.argv)
     raise
 
 import json

@@ -1183,7 +1183,7 @@
         const h = arenaCanvas.height;
         ctx.clearRect(0, 0, w, h);
 
-      // Fondo Dark Slate Omarchy con sutil gradiente
+      // Fondo Dark Slate con sutil gradiente
       const bgGrad = ctx.createRadialGradient(w / 2, h * 0.65, 30, w / 2, h * 0.65, w * 0.7);
       bgGrad.addColorStop(0, '#10161a');
       bgGrad.addColorStop(1, '#090d0f');
@@ -1214,7 +1214,7 @@
       const stageW = stageHalfW * 2;
       const stageH = 14;
 
-      // Base flotante del escenario (Omarchy Floating Crystal Stage)
+      // Base flotante del escenario
       ctx.save();
       const stageGrad = ctx.createLinearGradient(centerX, stageY, centerX, stageY + 115);
       stageGrad.addColorStop(0, 'rgba(18, 26, 30, 0.95)');
@@ -1244,7 +1244,7 @@
       ctx.stroke();
       ctx.restore();
 
-      // Superficie principal del escenario (Línea esmeralda luminosa Omarchy)
+      // Superficie principal del escenario (Línea esmeralda luminosa)
       ctx.save();
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 3;
@@ -1311,7 +1311,7 @@
           ctx.restore();
         }
 
-        // Plataformas laterales y superior estilo Omarchy
+        // Plataformas laterales y superior
         const platOffset = Math.min(28.5, currentEdge * 0.42);
         drawSoftPlatform(-platOffset, 27.2, 22.0, '#06b6d4', 'rgba(6, 182, 212, 0.5)');
         drawSoftPlatform( platOffset, 27.2, 22.0, '#06b6d4', 'rgba(6, 182, 212, 0.5)');
@@ -1381,7 +1381,7 @@
         ctx.restore();
       }
 
-      // Dibujar P1 (LUIGI o FOX estilo Omarchy)
+      // Dibujar P1 (LUIGI o FOX)
       const p1NameStr = (gameState.p1.name || "Luigi").toLowerCase();
       const isLuigi = p1NameStr.includes("luigi");
 
@@ -1466,7 +1466,7 @@
       ctx.stroke();
       ctx.restore();
 
-      // Floating Name Tags estilo Pill Omarchy
+      // Floating Name Tags estilo Pill
       function drawPlayerTag(x, y, name, color, bg) {
         ctx.save();
         ctx.font = '600 11px "Plus Jakarta Sans", sans-serif';
