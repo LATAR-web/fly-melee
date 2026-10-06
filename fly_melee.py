@@ -14,7 +14,8 @@ try:
 except ImportError:
     venv_python = "/home/ltar/.venvs/pytorch/bin/python"
     if os.path.exists(venv_python) and sys.executable != venv_python:
-        os.execv(venv_python, [venv_python] + sys.argv)
+        script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+        os.execv(venv_python, [venv_python, script] + sys.argv[1:])
     raise
 
 import time
@@ -338,12 +339,13 @@ def select_stage_battlefield(gamestate, controller):
         else:
             controller.release_button(melee.Button.BUTTON_A)
 
-def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_character="luigi"):
+def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_character="luigi", lightweight=False):
     char_title = fly_character.upper()
     char_desc = "LUIGI (Wavedash SSS & Shoryuken)" if char_title == "LUIGI" else "FOX McCLOUD (20XX Shine & Spacie)"
     opponent_label = f"BOT CPU NIVEL {cpu_level}" if cpu_level else "JUGADOR HUMANO (TÚ)"
+    net_desc = "49k neuronas (Ultra-rápido 0 lag)" if lightweight else "MaleCNS 400k (Conectoma completo)"
     print("=" * 72)
-    print(f"  🪰 CEREBRO DE LA MOSCA (MaleCNS 400k) VS {opponent_label}")
+    print(f"  🪰 CEREBRO DE LA MOSCA ({net_desc}) VS {opponent_label}")
     print(f"  🎮 Puerto 1: {char_desc}")
     if cpu_level:
         print(f"  🤖 Puerto 2: BOT MELEE CPU Nivel {cpu_level} (Configurado automáticamente)")
@@ -363,7 +365,7 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
             print(f"⚠️ Aviso: No se encontró la ISO en {DEFAULT_ISO}.")
             
     # 1. Inicializar cerebro biológico
-    brain = FlyBrain()
+    brain = FlyBrain(lightweight=lightweight)
     brain.active_character = fly_character.upper()
     
     # 2. Inicializar consola de Dolphin usando DOLPHIN_HOME
@@ -441,6 +443,17 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
     print("👉 ¡Toma tu teclado, mueve tu ficha y elige a tu personaje con J, X o Espacio!\n")
     
     step_count = 0
+    active_controller_buttons = {
+        melee.Button.BUTTON_A: False,
+        melee.Button.BUTTON_B: False,
+        melee.Button.BUTTON_X: False,
+        melee.Button.BUTTON_Y: False,
+        melee.Button.BUTTON_Z: False,
+        melee.Button.BUTTON_L: False,
+        melee.Button.BUTTON_R: False,
+        melee.Button.BUTTON_START: False,
+        melee.Button.BUTTON_D_UP: False,
+    }
     menu_helper_fly = melee.MenuHelper()
     was_in_game = False
     match_number = 1
@@ -455,20 +468,26 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     print(f"\n🚪 Dolphin se ha cerrado (código de salida: {console._process.returncode}). Sesión finalizada limpiamente.")
                     break
                 print(f"\n⚠️ [Slippi Bridge] Desconexión detectada ({type(conn_err).__name__}). Reenganchando Dolphin...")
-                try:
-                    console._slippstream.shutdown()
-                except Exception:
-                    pass
-                time.sleep(0.5)
-                try:
-                    if console.connect():
-                        print("✅ ¡Reconexión exitosa a Dolphin! Reanudando...")
-                        continue
-                    else:
-                        print("❌ No se pudo reconectar a Dolphin.")
+                reconnected = False
+                for attempt in range(1, 15):
+                    if console._process is not None and console._process.poll() is not None:
                         break
-                except Exception as rec_err:
-                    print(f"❌ Error al reconectar: {rec_err}")
+                    time.sleep(0.5)
+                    try:
+                        console._slippstream.shutdown()
+                    except Exception:
+                        pass
+                    try:
+                        if console.connect():
+                            print(f"✅ ¡Reconexión exitosa a Dolphin (intento {attempt})! Reanudando...")
+                            reconnected = True
+                            break
+                    except Exception:
+                        pass
+                if reconnected:
+                    continue
+                else:
+                    print("❌ No se pudo reconectar a Dolphin tras múltiples intentos.")
                     break
 
             if gamestate is None:
@@ -498,6 +517,9 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                 # Reiniciar para la siguiente partida sin bugs
                 brain.reset()
                 step_count = 0
+                controller_fly.release_all()
+                for b in active_controller_buttons:
+                    active_controller_buttons[b] = False
                 postgame_frames = 0
                 match_number += 1
                 menu_helper_fly = melee.MenuHelper() # Nuevo helper limpio para la revancha
@@ -516,8 +538,8 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
             elif gamestate.menu_state == melee.Menu.STAGE_SELECT:
                 select_stage_battlefield(gamestate, controller_fly)
 
-            # 3. Pantalla de Victoria / Tabla de Resultados (Post-Game / Scores / Unknown)
-            elif gamestate.menu_state in [melee.Menu.POSTGAME_SCORES, melee.Menu.UNKNOWN_MENU]:
+            # 3. Pantalla de Victoria / Tabla de Resultados (Post-Game Scores)
+            elif gamestate.menu_state == melee.Menu.POSTGAME_SCORES:
                 postgame_frames += 1
                 if postgame_frames % 8 == 0:
                     controller_fly.press_button(melee.Button.BUTTON_START)
@@ -525,6 +547,12 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     controller_fly.press_button(melee.Button.BUTTON_A)
                 else:
                     controller_fly.release_all()
+
+            # 4. Menú Desconocido / Transición / Diálogo del Sistema (Liberar mandos para evitar confirmar salidas involuntarias)
+            elif gamestate.menu_state == melee.Menu.UNKNOWN_MENU:
+                controller_fly.release_all()
+                controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, 0.5, 0.5)
+                controller_fly.tilt_analog(melee.Button.BUTTON_C, 0.5, 0.5)
 
             # 4. Menú Principal o Press Start
             elif gamestate.menu_state in [melee.Menu.MAIN_MENU, melee.Menu.PRESS_START]:
@@ -546,7 +574,8 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                         if cand and getattr(cand, "stock", None) is not None:
                             brain.prev_p2_stock = int(cand.stock)
                             break
-                    brain.dopamine = 0.65 # Motivación inicial de combate al 65%
+                    brain.dopamine = 0.85 # Motivación inicial de combate: Adicción a ganar (85%)
+                    brain.endorphin = 0.50
                     brain.octopamine = 0.20
                     step_count = 0
                     continue
@@ -562,8 +591,30 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                 if fly_player and human_player:
                     # Guardia de animación de entrada (Fox bajando del Arwing):
                     act_str_check = str(getattr(fly_player, "action", ""))
-                    if "ENTRY" in act_str_check or getattr(fly_player.action, "value", 0) in [322, 323, 324]:
+                    act_val_p1 = getattr(fly_player.action, "value", 0)
+                    if "ENTRY" in act_str_check or act_val_p1 in [322, 323, 324]:
                         controller_fly.release_all()
+                        controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, 0.5, 0.5)
+                        controller_fly.tilt_analog(melee.Button.BUTTON_C, 0.5, 0.5)
+                        continue
+
+                    # Guardia de muerte: Si la mosca está en animación de muerte (0..10), liberar controles y limpiar buffers
+                    is_p1_dead = (act_val_p1 in range(0, 11)) or ("DEAD_" in act_str_check and "FALL" not in act_str_check and "LEAP" not in act_str_check)
+                    if is_p1_dead:
+                        controller_fly.release_all()
+                        controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, 0.5, 0.5)
+                        controller_fly.tilt_analog(melee.Button.BUTTON_C, 0.5, 0.5)
+                        brain.stimulate_sensory(
+                            threat_level=0.0,
+                            rel_x=0.0,
+                            rel_y=0.0,
+                            is_offstage=True,
+                            looming_rate=0.0,
+                            player=fly_player,
+                            opponent=human_player,
+                            current_frame=step_count
+                        )
+                        step_count += 1
                         continue
                     # 1. Extraer posición y velocidad de aproximación óptica (Looming)
                     dx = human_player.position.x - fly_player.position.x
@@ -605,28 +656,78 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     # 4. Decodificar decisión técnica inteligente (Luigi o Fox según personaje en P1)
                     action = brain.get_controller_decision(player=fly_player, opponent=human_player, current_frame=step_count, stage=current_stage)
                     
-                    # 5. Aplicar acciones en el mando de la mosca (P1) sin bloqueos mutuamente excluyentes
-                    controller_fly.release_all()
-                    
+                    # 5. Aplicar acciones en el mando de la mosca (P1) mediante transiciones limpias (Edge-Triggered)
+                    # Se eliminó controller_fly.release_all() por frame para NO saturar el buffer FIFO de Dolphin
+                    # ni cancelar cargas continuas (Green Missile) o pulsos de botón (Cyclone mashing / Jump).
+                    desired_buttons = {b: False for b in active_controller_buttons}
+
+                    # Jump: pulso limpio de flanco de subida (1 frame ON, 1 frame OFF)
                     if action.get("jump"):
-                        controller_fly.press_button(melee.Button.BUTTON_Y)
-                    if action.get("attack"):
-                        controller_fly.press_button(melee.Button.BUTTON_A)
+                        if active_controller_buttons[melee.Button.BUTTON_Y]:
+                            desired_buttons[melee.Button.BUTTON_Y] = False
+                        else:
+                            desired_buttons[melee.Button.BUTTON_Y] = True
+                    else:
+                        desired_buttons[melee.Button.BUTTON_Y] = False
+
+                    # Special (Button B):
+                    # - MASHING (ej. Rising Cyclone): alternar press y release en cada frame (30Hz nativos limpios)
+                    # - Carga o poder sostenido (ej. Green Missile charge, Fire Fox, etc.): mantener presionado
                     if action.get("special"):
                         if "MASHING" in action.get("name", ""):
-                            if step_count % 2 == 0:
-                                controller_fly.press_button(melee.Button.BUTTON_B)
+                            desired_buttons[melee.Button.BUTTON_B] = not active_controller_buttons[melee.Button.BUTTON_B]
                         else:
-                            controller_fly.press_button(melee.Button.BUTTON_B)
+                            desired_buttons[melee.Button.BUTTON_B] = True
+                    else:
+                        desired_buttons[melee.Button.BUTTON_B] = False
+
+                    # Attack (Button A): pulso limpio (1 frame ON, 1 frame OFF) para encadenar jabs/pummels sin bloqueo de smash charge
+                    if action.get("attack"):
+                        if active_controller_buttons[melee.Button.BUTTON_A]:
+                            desired_buttons[melee.Button.BUTTON_A] = False
+                        else:
+                            desired_buttons[melee.Button.BUTTON_A] = True
+                    else:
+                        desired_buttons[melee.Button.BUTTON_A] = False
+
+                    # Shield (Button L):
                     if action.get("shield"):
-                        controller_fly.press_button(melee.Button.BUTTON_L)
+                        desired_buttons[melee.Button.BUTTON_L] = True
+
+                    # Grab (Button Z): pulso limpio para no quedar atascado en Light Shield
                     if action.get("grab"):
-                        controller_fly.press_button(melee.Button.BUTTON_Z)
+                        if active_controller_buttons[melee.Button.BUTTON_Z]:
+                            desired_buttons[melee.Button.BUTTON_Z] = False
+                        else:
+                            desired_buttons[melee.Button.BUTTON_Z] = True
+                    else:
+                        desired_buttons[melee.Button.BUTTON_Z] = False
+
+                    # Taunt (Button D_UP):
                     if action.get("taunt"):
-                        controller_fly.press_button(melee.Button.BUTTON_D_UP)
+                        desired_buttons[melee.Button.BUTTON_D_UP] = True
+
+                    # Enviar únicamente cambios de estado (Rising edge -> press, Falling edge -> release)
+                    for btn, desired in desired_buttons.items():
+                        if desired and not active_controller_buttons[btn]:
+                            controller_fly.press_button(btn)
+                            active_controller_buttons[btn] = True
+                        elif not desired and active_controller_buttons[btn]:
+                            controller_fly.release_button(btn)
+                            active_controller_buttons[btn] = False
                         
-                    controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, action["stick_x"], action["stick_y"])
-                    controller_fly.tilt_analog(melee.Button.BUTTON_C, action["c_stick_x"], action["c_stick_y"])
+                    # Reset C-stick a neutral (0.5, 0.5) si el personaje ya está ejecutando la animación de un ataque previo para que Melee registre el siguiente C-stick flick
+                    c_x = float(action.get("c_stick_x", 0.5))
+                    c_y = float(action.get("c_stick_y", 0.5))
+                    fly_act_val = getattr(getattr(fly_player, "action", None), "value", None)
+                    if fly_act_val is None:
+                        fly_act_val = fly_player.action if isinstance(getattr(fly_player, "action", None), int) else None
+                    if fly_act_val is not None and 44 <= fly_act_val <= 75:
+                        c_x = 0.5
+                        c_y = 0.5
+
+                    controller_fly.tilt_analog(melee.Button.BUTTON_MAIN, float(action.get("stick_x", 0.5)), float(action.get("stick_y", 0.5)))
+                    controller_fly.tilt_analog(melee.Button.BUTTON_C, c_x, c_y)
                     
                     step_count += 1
                     
@@ -641,18 +742,27 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                             "stage_edge": float(stage_edge_val),
                             "distance": float(distance),
                             "threat": float(threat),
-                            "action_name": action["name"],
-                            "dopamine": action["stats"]["dopamine"],
-                            "octopamine": action["stats"]["octopamine"],
+                            "action_name": action.get("name", "EN GUARDIA"),
+                            "dopamine": action.get("stats", {}).get("dopamine", getattr(brain, "dopamine", 0.85)),
+                            "endorphin": action.get("stats", {}).get("endorphin", getattr(brain, "endorphin", 0.5)),
+                            "flow_state": action.get("stats", {}).get("flow_state", False),
+                            "octopamine": action.get("stats", {}).get("octopamine", getattr(brain, "octopamine", 0.2)),
                             "combo_count": getattr(brain, "combo_count", 0),
+                            "last_power": getattr(brain, "last_luigi_power", None),
                             "num_neurons": getattr(brain, "num_neurons", 395144),
                             "memory": {
                                 "matches_played": brain.long_term_memory.get("matches_played", 0),
                                 "matches_won": brain.long_term_memory.get("matches_won", 0),
                                 "total_kos": brain.long_term_memory.get("total_kos", 0),
-                                "edge_fear": round(float(brain.long_term_memory.get("edge_fear", 1.15)), 2),
+                                "total_deaths": brain.long_term_memory.get("total_deaths", 0),
+                                "win_addiction": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("win_addiction", 5.0)), 2),
+                                "loss_aversion_fury": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("loss_aversion_fury", 5.0)), 2),
+                                "edge_fear": round(float(brain.long_term_memory.get("edge_fear", 1.0)), 2),
                                 "combo_mastery": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("combo_mastery", 1.6)), 2),
-                                "offstage_aggression": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("offstage_aggression", 1.65)), 2)
+                                "offstage_aggression": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("offstage_aggression", 1.65)), 2),
+                                "endorphin_resilience": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("endorphin_resilience", 1.5)), 2),
+                                "pain_tolerance": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("pain_tolerance", 1.4)), 2),
+                                "flow_mastery": round(float(brain.long_term_memory.get("synaptic_plasticity", {}).get("flow_mastery", 1.5)), 2)
                             },
                             "p1": {
                                 "name": f"{p1_char_name} (Mosca)",
@@ -687,15 +797,19 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                             p2_pct = int(human_player.percent)
                             p1_stk = int(fly_player.stock)
                             p2_stk = int(human_player.stock)
-                            dopa_val = action['stats']['dopamine']
-                            dopa_icon = "🔥" if dopa_val >= 0.65 else ("⚡" if dopa_val >= 0.25 else "💀 SHOCK")
+                            dopa_val = action.get("stats", {}).get("dopamine", getattr(brain, "dopamine", 0.85))
+                            dopa_icon = "🔥 ADICCIÓN" if dopa_val >= 0.80 else "⚡ FURIA"
+                            endo_val = action.get("stats", {}).get("endorphin", getattr(brain, "endorphin", 0.5))
+                            flow_active = action.get("stats", {}).get("flow_state", False)
+                            flow_str = " ✨ FLOW 20XX" if flow_active else ""
                             combo_str = f"| 💥 COMBO x{brain.combo_count}" if brain.combo_count > 1 else ""
                             stage_display = f" en {stage_name_str}" if stage_name_str else ""
                             opp_label = f"CPU L{cpu_level}" if cpu_level else "Tú"
-                            print(f"[{step_count//60:3d}s] {action['name']} | "
+                            octo_val = action.get("stats", {}).get("octopamine", getattr(brain, "octopamine", 0.2))
+                            print(f"[{step_count//60:3d}s] {action.get('name', 'COMBATE')} | "
                                   f"{p1_char_disp}(Mosca 400k): {p1_pct:3d}% ({p1_stk}⭐) vs "
                                   f"{opp_label}({human_char_name}): {p2_pct:3d}% ({p2_stk}⭐){stage_display} | "
-                                  f"🧠 Dopa:{int(dopa_val*100)}% {dopa_icon} {combo_str} | Octo:{int(action['stats']['octopamine']*100)}%")
+                                  f"🧠 Dopa:{int(dopa_val*100)}% {dopa_icon} Endo:{int(endo_val*100)}% 🛡️{flow_str} {combo_str} | Octo:{int(octo_val*100)}%")
                         except Exception:
                             pass
                               
@@ -703,7 +817,11 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
         print("\n🛑 Deteniendo partida.")
     finally:
         telemetry_client.close()
-        console.stop()
+        try:
+            if 'console' in locals() and console is not None:
+                console.stop()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fly Brain vs Human Player / CPU Bot Melee Bridge")
@@ -711,6 +829,7 @@ if __name__ == "__main__":
     parser.add_argument("--iso", type=str, default=None, help="Ruta a Super Smash Bros Melee NTSC ISO")
     parser.add_argument("--cpu", type=int, default=None, help="Nivel de CPU rival en Puerto 2 (ej: 9 para Bot Nivel 9)")
     parser.add_argument("--character", "-c", type=str, default="luigi", choices=["luigi", "fox"], help="Personaje de la mosca (luigi o fox)")
+    parser.add_argument("--lightweight", "-l", action="store_true", help="Modo neuronal ultraligero (49k neuronas / 0 lag / 60 FPS garantizados)")
     args = parser.parse_args()
     
-    run_fly_vs_human(dolphin_path=args.dolphin, iso_path=args.iso, cpu_level=args.cpu, fly_character=args.character)
+    run_fly_vs_human(dolphin_path=args.dolphin, iso_path=args.iso, cpu_level=args.cpu, fly_character=args.character, lightweight=args.lightweight)

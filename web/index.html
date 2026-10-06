@@ -266,6 +266,8 @@
     .circuit-item.active-pam .circuit-dot { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
     .circuit-item.active-ppl1 { color: var(--rose); font-weight: 600; }
     .circuit-item.active-ppl1 .circuit-dot { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
+    .circuit-item.active-endo { color: #a78bfa; font-weight: 600; }
+    .circuit-item.active-endo .circuit-dot { background: #a78bfa; box-shadow: 0 0 10px #a78bfa; }
 
     /* Scoreboard in Melee Arena */
     .arena-scoreboard {
@@ -616,7 +618,7 @@
         <span style="font-size:18px;">🪰</span> FlyWire Melee
       </span>
       <span class="badge badge-fox" id="p1-badge" onclick="toggleCharacter()" style="cursor:pointer;" title="Click para alternar entre Luigi y Fox McCloud">🟢 Luigi</span>
-      <span class="badge badge-neurons">395k Neuronas LIF</span>
+      <span class="badge badge-neurons" id="neurons-badge">⚡ 49k Ultra-Fluido</span>
       <span class="badge" id="stage-badge" style="background:rgba(168,85,247,0.12); color:#c084fc; border:1px solid rgba(168,85,247,0.3);">Battlefield</span>
       <span class="badge badge-live" id="live-badge">● Esperando Dolphin</span>
     </div>
@@ -647,19 +649,25 @@
       <!-- Top Left Brain Metrics -->
       <div class="brain-hud">
         <h4 style="color:var(--emerald-light); margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:5px; font-weight:700; font-size:11px; letter-spacing:0.5px;">MONITOR NEURAL BIOLÓGICO</h4>
-        <div class="brain-metric"><span>Neuronas biológicas:</span><span class="val">395,144</span></div>
-        <div class="brain-metric"><span>Sinapsis computadas:</span><span class="val">~73.0M CSC</span></div>
+        <div class="brain-metric"><span>Neuronas biológicas:</span><span class="val" id="val-neurons">49,393</span></div>
+        <div class="brain-metric"><span>Sinapsis computadas:</span><span class="val" id="val-synapses">~9.05M CSC</span></div>
+        <div class="brain-metric"><span>Modo de Ejecución:</span><span class="val" id="val-mode" style="color:var(--emerald-light);">Ultra-Fluido 60 FPS (0 lag)</span></div>
         <div class="brain-metric"><span>Frecuencia simulación:</span><span class="val" id="val-fps">60 FPS</span></div>
         <div class="brain-metric"><span>Dopamina PAM (Ataque):</span><span class="val" id="val-dopa" style="color:var(--amber);">50%</span></div>
+        <div class="brain-metric"><span>Endorfina (Analgesia/Flow):</span><span class="val" id="val-endo" style="color:#a78bfa;">50%</span></div>
         <div class="brain-metric"><span>Octopamina PPL1 (Alerta):</span><span class="val" id="val-octo" style="color:var(--rose);">20%</span></div>
         <div class="brain-metric"><span>Racha de Combos:</span><span class="val" id="val-combo" style="color:var(--emerald-light);">0</span></div>
+        <div class="brain-metric"><span>Último Remate / Poder:</span><span class="val" id="val-last-power" style="color:#fb7185;">En Guardia</span></div>
         <div class="brain-metric"><span>Amenaza visual:</span><span class="val" id="val-threat">0%</span></div>
         <div class="brain-metric" style="border-top:1px solid rgba(255,255,255,0.06); margin-top:6px; padding-top:6px;">
           <span>Memoria Sináptica:</span><span class="val" style="color:var(--cyan);">PERSISTENTE</span>
         </div>
         <div class="brain-metric"><span>Partidas Aprendidas:</span><span class="val" id="val-matches" style="color:#c084fc;">0</span></div>
-        <div class="brain-metric"><span>Aversión al Borde:</span><span class="val" id="val-edge-fear" style="color:var(--rose);">1.35x</span></div>
+        <div class="brain-metric"><span>Adicción a Ganar:</span><span class="val" id="val-win-addiction" style="color:#f59e0b; font-weight:bold;">5.00x 🔥</span></div>
+        <div class="brain-metric"><span>Furia ante Pérdida:</span><span class="val" id="val-loss-fury" style="color:var(--rose); font-weight:bold;">5.00x ⚡</span></div>
+        <div class="brain-metric"><span>Aversión al Borde:</span><span class="val" id="val-edge-fear" style="color:var(--emerald-light);">1.00x (Cero Miedo)</span></div>
         <div class="brain-metric"><span>Maestría de Combos:</span><span class="val" id="val-combo-mastery" style="color:var(--emerald-light);">1.20x</span></div>
+        <div class="brain-metric"><span>Resiliencia Endorfina:</span><span class="val" id="val-endo-resilience" style="color:#a78bfa;">1.50x</span></div>
       </div>
 
       <!-- Bottom Left Live Circuits Lighting Monitor -->
@@ -667,6 +675,7 @@
         <div class="circuit-hud-title">Circuitos Activos</div>
         <div class="circuit-item" id="c-optic"><div class="circuit-dot"></div><span>Fotorreceptores / Óptico (C0)</span></div>
         <div class="circuit-item" id="c-pam"><div class="circuit-dot"></div><span>Dopamina PAM (Recompensa C1)</span></div>
+        <div class="circuit-item" id="c-endo"><div class="circuit-dot"></div><span>Endorfina / Flow (Analgesia C1)</span></div>
         <div class="circuit-item" id="c-ppl1"><div class="circuit-dot"></div><span>Octopamina PPL1 (Alerta C1)</span></div>
         <div class="circuit-item" id="c-gf"><div class="circuit-dot"></div><span>Giant Fiber DNp01 (Escape / Salto C2)</span></div>
         <div class="circuit-item" id="c-attack"><div class="circuit-dot"></div><span>Motor Ataque (A / Smash C2)</span></div>
@@ -1090,6 +1099,12 @@
         end   = is400k ? 197571 : 74000;
         r = 2.5; g = 2.0; b = 0.2;
         badgeId = 'c-pam';
+      } else if (type === 'endo') {
+        // Vía Endorfinérgica / Opioide (Analgesia, Resiliencia y Flow State): Púrpura Neón Eléctrico
+        start = is400k ? 148179 : 49393;
+        end   = is400k ? 197571 : 74000;
+        r = 1.8; g = 0.5; b = 2.5;
+        badgeId = 'c-endo';
       } else if (type === 'ppl1') {
         // Núcleo PPL1 Octopaminérgico (Alerta Máxima de Supervivencia): Rojo Carmesí
         start = is400k ? 98786 : 74001;
@@ -1680,30 +1695,89 @@
           if (p2s) p2s.textContent = "⭐".repeat(Math.max(0, data.p2.stock));
         }
 
-        // Banner de Técnica
+        // Banner de Técnica y Detección de Humillación
         const banner = document.getElementById('action-banner');
         if (banner) {
           const actName = data.action_name || (data.action && data.action.name) || "En Guardia";
-          banner.textContent = `⚡ ${actName}`;
+          const isHumiliation = actName.includes("HUMILLACIÓN") || actName.includes("SHORYUKEN") || 
+                                actName.includes("METEOR SPIKE") || actName.includes("TEABAG") || 
+                                actName.includes("PING!") || actName.includes("CHAINGRAB");
+          if (isHumiliation) {
+            banner.textContent = `💥 ${actName}`;
+            banner.style.background = 'linear-gradient(135deg, rgba(244,63,94,0.88), rgba(168,85,247,0.88))';
+            banner.style.color = '#ffffff';
+            banner.style.boxShadow = '0 0 20px rgba(244,63,94,0.6)';
+            banner.style.fontWeight = '800';
+          } else {
+            banner.textContent = `⚡ ${actName}`;
+            banner.style.background = '';
+            banner.style.color = '';
+            banner.style.boxShadow = '';
+            banner.style.fontWeight = '';
+          }
+        }
+
+        // Modo y Neuronas Dinámicas
+        if (data.num_neurons !== undefined) {
+          const isLight = data.num_neurons < 60000;
+          const nBadge = document.getElementById('neurons-badge');
+          if (nBadge) {
+            nBadge.textContent = isLight ? "⚡ 49k Modo Ultra-Fluido" : "🧠 395k Conectoma Completo";
+            nBadge.style.color = isLight ? "#34d399" : "var(--cyan-light)";
+            nBadge.style.borderColor = isLight ? "rgba(16, 185, 129, 0.4)" : "rgba(6, 182, 212, 0.25)";
+          }
+          const valNeurons = document.getElementById('val-neurons');
+          if (valNeurons) valNeurons.textContent = `${data.num_neurons.toLocaleString()}`;
+          const valSynapses = document.getElementById('val-synapses');
+          if (valSynapses) valSynapses.textContent = isLight ? "~9.05M CSC" : "~73.0M CSC";
+          const valMode = document.getElementById('val-mode');
+          if (valMode) {
+            valMode.textContent = isLight ? "Ultra-Fluido 60 FPS (0 lag)" : "Conectoma Completo (C0-C7)";
+            valMode.style.color = isLight ? "#34d399" : "#38bdf8";
+          }
+        }
+
+        const valLastPower = document.getElementById('val-last-power');
+        if (valLastPower) {
+          const power = data.last_power || (data.action_name && data.action_name.includes("SHORYUKEN") ? "SHORYUKEN PING!" : null);
+          if (power) {
+            valLastPower.textContent = `💥 ${power}`;
+            valLastPower.style.color = "#fb7185";
+          }
         }
 
         // Métricas de Neuroquímica
         const valDopa = document.getElementById('val-dopa');
+        const valEndo = document.getElementById('val-endo');
         const valOcto = document.getElementById('val-octo');
         const valThreat = document.getElementById('val-threat');
         const valCombo = document.getElementById('val-combo');
 
         if (valDopa && data.dopamine !== undefined) {
           const dPct = Math.round(data.dopamine * 100);
-          if (data.dopamine <= 0.05) {
-            valDopa.textContent = `${dPct}% 💀 (Shock)`;
-            valDopa.style.color = 'var(--rose)';
+          if (data.dopamine >= 0.85) {
+            valDopa.textContent = `${dPct}% 🔥 (Adicción Depredadora)`;
+            valDopa.style.color = '#f59e0b';
           } else if (data.dopamine >= 0.70) {
-            valDopa.textContent = `${dPct}% 🔥 (Furia)`;
+            valDopa.textContent = `${dPct}% ⚡ (Furia Aversión)`;
             valDopa.style.color = 'var(--amber)';
           } else {
-            valDopa.textContent = `${dPct}%`;
+            valDopa.textContent = `${dPct}% (Foco 20XX)`;
             valDopa.style.color = 'var(--cyan)';
+          }
+        }
+
+        if (valEndo && data.endorphin !== undefined) {
+          const ePct = Math.round(data.endorphin * 100);
+          if (data.flow_state || data.endorphin >= 0.85) {
+            valEndo.textContent = `${ePct}% ✨ FLOW 20XX`;
+            valEndo.style.color = '#c084fc';
+          } else if (data.endorphin >= 0.65) {
+            valEndo.textContent = `${ePct}% 🛡️ (Zen)`;
+            valEndo.style.color = '#a78bfa';
+          } else {
+            valEndo.textContent = `${ePct}%`;
+            valEndo.style.color = '#94a3b8';
           }
         }
 
@@ -1719,16 +1793,28 @@
         // Métricas de Memoria Persistente Aprendida
         if (data.memory) {
           const valMatches = document.getElementById('val-matches');
+          const valWinAddict = document.getElementById('val-win-addiction');
+          const valLossFury = document.getElementById('val-loss-fury');
           const valEdgeFear = document.getElementById('val-edge-fear');
           const valComboMastery = document.getElementById('val-combo-mastery');
+          const valEndoResilience = document.getElementById('val-endo-resilience');
           if (valMatches && data.memory.matches_played !== undefined) {
             valMatches.textContent = `${data.memory.matches_played} (KOs: ${data.memory.total_kos || 0})`;
           }
+          if (valWinAddict && data.memory.win_addiction !== undefined) {
+            valWinAddict.textContent = `${data.memory.win_addiction}x 🔥`;
+          }
+          if (valLossFury && data.memory.loss_aversion_fury !== undefined) {
+            valLossFury.textContent = `${data.memory.loss_aversion_fury}x ⚡`;
+          }
           if (valEdgeFear && data.memory.edge_fear !== undefined) {
-            valEdgeFear.textContent = `${data.memory.edge_fear}x (Zona Segura)`;
+            valEdgeFear.textContent = `${data.memory.edge_fear}x (Cero Miedo)`;
           }
           if (valComboMastery && data.memory.combo_mastery !== undefined) {
             valComboMastery.textContent = `${data.memory.combo_mastery}x`;
+          }
+          if (valEndoResilience && data.memory.endorphin_resilience !== undefined) {
+            valEndoResilience.textContent = `${data.memory.endorphin_resilience}x`;
           }
         }
 
@@ -1753,6 +1839,7 @@
           if (data.combo_count > 1) activeCircuits.push(`Cerebelo Combo (${data.combo_count}x)`);
           if (data.threat > 0.35) activeCircuits.push("Fotorreceptores Visuales");
           if (data.dopamine > 0.55) activeCircuits.push("Dopamina PAM (Ataque)");
+          if (data.endorphin > 0.55 || data.flow_state) activeCircuits.push(data.flow_state ? "✨ Flow State 20XX" : "Endorfina (Analgesia)");
           if (data.octopamine > 0.35) activeCircuits.push("Octopamina PPL1 (Defensa)");
 
           if (execSub) {
@@ -1834,6 +1921,7 @@
           if (data.combo_count > 1) igniteCircuit('combo');
           if (data.threat > 0.35) igniteCircuit('optic');
           if (data.dopamine > 0.6) igniteCircuit('pam');
+          if (data.endorphin > 0.6 || data.flow_state) igniteCircuit('endo');
           if (data.octopamine > 0.35) igniteCircuit('ppl1');
         }
 

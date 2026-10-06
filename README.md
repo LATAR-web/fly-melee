@@ -1,6 +1,6 @@
 # 🪰 Fly-Melee: Conectoma de la Mosca (400k) × Super Smash Bros. Melee
 
-[![Tests Status](https://img.shields.io/badge/Tests-81%2F81%20Passing-brightgreen.svg)](#-pruebas-y-verificación-del-sistema-8181)
+[![Tests Status](https://img.shields.io/badge/Tests-100%2F100%20Passing-brightgreen.svg)](#-pruebas-y-verificación-del-sistema-100100)
 [![Simulation Rate](https://img.shields.io/badge/Simulation-60Hz%20Nativos%20(0.97ms)-blue.svg)](#-arquitectura-técnica-y-modulación-por-clusters)
 [![Neurons](https://img.shields.io/badge/LIF%20Neurons-395%2C144-orange.svg)](#-arquitectura-técnica-y-modulación-por-clusters)
 [![Synapses](https://img.shields.io/badge/Active%20Synapses-72.9M%20(CSC)-purple.svg)](#-arquitectura-técnica-y-modulación-por-clusters)
@@ -20,8 +20,18 @@ El conectoma biológico decodifica la percepción visual del combate, procesa la
 Para arrancar el juego en Dolphin y visualizar la telemetría biológica en 3D:
 
 ```bash
+# Opción Recomendada: Modo Ultra-Fluido 60 FPS (0 lag / 470 FPS / 49k neuronas)
+./start_fly.sh 5
+
+# O menú interactivo para seleccionar modo y personaje:
 ./start_fly.sh
 ```
+
+### ⚡ Comparativa de Rendimiento y Modos de Simulación:
+| Modo | Neuronas LIF | Sinapsis Activas | Tiempo por Frame | FPS Equivalentes | Dolphin FPS | Lag / Caída |
+|---|---|---|---|---|---|---|
+| **⚡ Ultra-Fluido (Opción 5)** | **49,393** (1 Cluster real) | **~9.05M CSC** | **2.12 ms** | **472 FPS** | **60.0 FPS** | **0% (Fluidez Absoluta)** |
+| **🧠 Conectoma Completo (Opción 1)** | 395,144 (8 Clusters) | ~73.0M CSC | 6.26 ms | 160 FPS | 58–60 FPS | < 2% |
 
 Esto ejecuta automáticamente:
 1. **Emulador Dolphin**: Inicia *Super Smash Bros. Melee* con la mosca conectada en el Puerto 1 y tus controles listos en el Puerto 2.
@@ -126,14 +136,25 @@ El sistema nervioso no utiliza árboles de decisión fijos ni heurísticas está
 
 ## 🥋 Arsenal Técnico 20XX de los Personajes
 
-### 🟢 Luigi (Fricción 0.005 & Tournament-Tier)
-1. **Wavedash Deslizante Infinito**: Aprovecha la tracción mínima de Luigi (0.005) para cruzar el escenario con 14 frames de intangibilidad.
-2. **Short-Hop B-Air Wall**: Salto corto con patada trasera dropkick de alto impacto (12% daño, knockback horizontal mortal).
-3. **Wavedash Down-Tilt Launcher**: Entrada a ras de suelo con Down-Tilt frame-5 que proyecta verticalmente al rival hacia combos aéreos.
-4. **Sweetspot Up-B Shoryuken Kill Confirm**: Remate a quemarropa (frame-8) con sonido "PING!" que noquea a porcentajes medios/altos.
-5. **Chaingrab / Regrab Loop en Fastfallers**: Cadena de agarres terrestres contra Fox, Falco y Falcon.
-6. **Ledge-Stall & Ledgedash Invencible**: Regrab defensivo en repisa y subida deslizante con intangibilidad.
-7. **Down-Taunt Meteor Spike**: Remate despectivo frame-45 en repisa contra rivales colgando indefensos.
+### 🟢 Luigi (Fricción 0.005 & Tournament-Tier / Humillación 20XX)
+1. **D-Throw ➔ Wavedash Slide ➔ Sweetspot Up-B Shoryuken Kill Confirm ("PING!")**:
+   La confirmación de muerte más destructiva y humillante del juego. Tras Down-Throw, si el rival hace DI hacia afuera ($6.5 < dist \le 16.0u$), Luigi se desliza instantáneamente con wavedash a quemarropa hacia su hurtbox y conecta el Sweetspot Up-B con sonido ensordecedor "PING!" (25% de daño directo y K.O. vertical fulminante).
+2. **Jab-Reset ➔ Shoryuken Kill Confirm**:
+   Castigo infalible ante tech fallido o derribo en suelo (*missed tech*). Jab Frame-2 fuerza el levantamiento neutral indefenso del oponente y conecta automáticamente el Shoryuken en la cara del rival.
+3. **Chaingrab 20XX / Regrab Loop en Fastfallers**:
+   Bucle de agarres terrestres con Wavedash contra Fox, Falco y Captain Falcon hasta porcentaje de remate letal.
+4. **Down-Taunt Meteor Spike (Frame-45)**:
+   El remate más despectivo de Super Smash Bros Melee: clava el tacón en la repisa con hitbox activa de 2 frames a 45° que envía al rival en meteoro vertical directo al fondo del abismo sin posibilidad de retorno.
+5. **Cerrojo de Esquina & Pressure Advance (Anti-Estancamiento)**:
+   Si el rival se refugia en una esquina, Luigi no se queda atascado lanzando golpes al aire: avanza implacablemente con Jab Frame-2, Bolas de Fuego continuas y Down-Smash semi-spike frame-5 en rango crítico ($dist \le 8.0u$).
+6. **Teabagging Táctico & Burla Psicológica (Disrespect 20XX)**:
+   Humillación automática con spam ultra-rápido de agacharse (*teabag*) o Burla despectiva cuando el rival cae al abismo sin doble salto o cuando es lanzado a la órbita estelar tras un Shoryuken.
+7. **Wavedash Deslizante Infinito (Fricción 0.005)**:
+   Aprovecha la tracción mínima de Luigi para cruzar cualquier escenario de punta a punta con 14 frames de intangibilidad y posicionamiento milimétrico.
+8. **Frame-3 N-Air Combo Breaker**:
+   El ataque de pánico más rápido del juego; rompe combos rivales durante el hitstun y castiga inmediatamente fuera de escudo (OoS).
+9. **Rising Cyclone Anti-Ceiling & Recuperación Infalible**:
+   Mashing a 30Hz de Down-B que rescata a Luigi de techos inferiores y abismos profundos sin entrar en freefall.
 
 ### 🦊 Fox McCloud (20XX Spacie)
 1. **Frame-1 Reflector Shine & Waveshine**: Presión de escudo y combos continuos en suelo.
@@ -145,9 +166,9 @@ El sistema nervioso no utiliza árboles de decisión fijos ni heurísticas está
 
 ---
 
-## 🧪 Pruebas y Verificación del Sistema (81/81)
+## 🧪 Pruebas y Verificación del Sistema (100/100)
 
-El proyecto cuenta con una suite integral de **81 pruebas automáticas** que validan la biomecánica, la recuperación anti-suicidios, la simulación a 60Hz y la modulación de clusters:
+El proyecto cuenta con una suite integral de **100 pruebas automáticas** que validan la biomecánica, la recuperación anti-suicidios, la simulación a 60Hz, el pipeline del mando edge-triggered y la modulación neuroquímica:
 
 ```bash
 /home/ltar/.venvs/pytorch/bin/python verify_fixes.py
@@ -159,15 +180,14 @@ El proyecto cuenta con una suite integral de **81 pruebas automáticas** que val
 - **Tests 31–50**: L-Cancel automático, Wiggle-out de tumble y geometría de escenarios.
 - **Tests 51–65**: Tracción de Luigi, Shoryuken Kill Confirm, Rising Cyclone y Jab-Reset confirm.
 - **Tests 66–76**: Ledge roll invencible, Shield Drop, Platform Edge-Cancel y Mash-Out a 60 inputs/s.
-- **Test 77**: Luigi Short-Hop B-Air Wall (`AERIAL_BAIR` buffered).
-- **Test 78**: Luigi Ledge-Stall Invincible Regrab (renovación de 30 frames de intangibilidad).
-- **Test 79**: Luigi Wavedash Down-Tilt Launcher (pop-up vertical).
-- **Test 80**: Modulación biológica por descarga de espigas en Clusters 5, 6 y 7.
-- **Test 81**: Simulación biológica continua a 60Hz nativos sin throttle.
+- **Tests 77–81**: Luigi Short-Hop B-Air Wall, Ledge-Stall, Down-Tilt launcher y simulación a 60Hz.
+- **Tests 82–90**: Libertad de avance en bordes (sin zigzag), anti-ceiling bajo escenario, guardado asíncrono, Flow State 20XX, y cero suicidios por wavedash.
+- **Tests 91–95**: Edgeguard terrestre seguro, recuperación dirigida con Cyclone/Up-B, neutralización en muerte y descenso seguro post-respawn.
+- **Tests 96–100**: Sistema neuroendocrino de adicción a ganar, purga de depresión, pipeline de mando edge-triggered 30Hz, Green Missile y prevención de suicidio con tracción 0.005.
 
 ```text
 ======================================================================
-🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (81/81 SUPERADAS)
+🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (100/100 SUPERADAS)
 ======================================================================
 ```
 

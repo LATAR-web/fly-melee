@@ -15,6 +15,8 @@ except ImportError:
 
 import json
 import math
+import threading
+import time
 from pathlib import Path
 
 STAGE_EDGES = {
@@ -175,35 +177,48 @@ class FlyBrain:
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self.memory_file = self.memory_dir / "long_term_synapses.json"
         
+        # Limpieza inicial de archivos temporales huérfanos
+        for tmp_f in self.memory_dir.glob("*.tmp"):
+            try:
+                tmp_f.unlink()
+            except Exception:
+                pass
+        
         default_memory = {
-            "version": 1.3,
+            "version": 1.4,
             "matches_played": 0,
             "matches_won": 0,
             "total_kos": 0,
             "total_deaths": 0,
             "total_combos": 0,
-            "edge_fear": 1.15, # Aversión moderada al borde para no suicidarse sin paralizar la ofensiva
+            "edge_fear": 1.0, # Purga total de fobias al borde: agresión y fluidez 20XX
             "synaptic_plasticity": {
-                "combo_mastery": 1.60,
-                "escape_reflex": 1.50,
-                "laser_pressure": 1.25,
-                "shine_counter": 1.30,
-                "shield_reaction": 1.40,
-                "edgeguard_mastery": 1.60,
-                "neutral_patience": 1.20,
-                "grab_combo_lethality": 1.70,
-                "offstage_aggression": 1.65,
-                "recovery_iq": 1.50,
-                "fastfaller_punish": 1.60,
-                "floaty_killer": 1.60,
-                "platform_shark_iq": 1.55,
-                "shdl_mastery": 1.40,
-                "cqc_counter_reflex": 1.60,
-                "whiff_punish_iq": 1.70,
-                "ledgedash_mastery": 1.70,
-                "tech_chase_reaction": 1.75,
-                "powershield_mastery": 1.70,
-                "shield_drop_iq": 1.65
+                "win_addiction": 5.0, # Máxima adicción biológica a ganar
+                "loss_aversion_fury": 5.0, # Furia y rechazo total a perder
+                "killer_instinct": 5.0, # Instinto depredador letal
+                "combo_mastery": 5.0,
+                "escape_reflex": 5.0,
+                "laser_pressure": 5.0,
+                "shine_counter": 5.0,
+                "shield_reaction": 5.0,
+                "edgeguard_mastery": 5.0,
+                "neutral_patience": 5.0,
+                "grab_combo_lethality": 5.0,
+                "offstage_aggression": 1.15, # Agresividad controlada: cero saltos suicidas
+                "recovery_iq": 5.0,
+                "fastfaller_punish": 5.0,
+                "floaty_killer": 5.0,
+                "platform_shark_iq": 5.0,
+                "shdl_mastery": 5.0,
+                "cqc_counter_reflex": 5.0,
+                "whiff_punish_iq": 5.0,
+                "ledgedash_mastery": 5.0,
+                "tech_chase_reaction": 5.0,
+                "powershield_mastery": 5.0,
+                "shield_drop_iq": 5.0,
+                "endorphin_resilience": 4.5,
+                "pain_tolerance": 4.5,
+                "flow_mastery": 5.0
             },
             "matchup_intelligence": {},
             "opponent_habits": {
@@ -239,14 +254,79 @@ class FlyBrain:
                             default_memory[k].update(v)
                         else:
                             default_memory[k] = v
-                    # Normalizar edge_fear para garantizar máxima agresividad sin fobias al borde
-                    if default_memory["edge_fear"] > 1.30:
-                        default_memory["edge_fear"] = 1.18
-                    print(f"💾 [Memoria Persistente] ¡Cerebro cargó experiencia previa! Partidas: {default_memory['matches_played']}, KOs: {default_memory['total_kos']}, Agresividad Offstage: {default_memory['synaptic_plasticity'].get('offstage_aggression', 1.5):.2f}x")
+                    # SEGURIDAD ANTI-SUICIDIO Y ADICCIÓN A GANAR
+                    default_memory["edge_fear"] = 1.0 # Cero miedo al borde purgado
+                    default_memory["total_deaths"] = 0 # Cero trauma acumulado
+                    if "learned_errors" in default_memory:
+                        default_memory["learned_errors"]["offstage_falls"] = 0
+                        default_memory["learned_errors"]["damage_absorbed"] = 0.0
+                        default_memory["learned_errors"]["grabbed_in_neutral"] = 0
+                        default_memory["learned_errors"]["shield_breaks"] = 0
+                    p = default_memory.setdefault("synaptic_plasticity", {})
+                    p["win_addiction"] = 5.0
+                    p["loss_aversion_fury"] = 5.0
+                    p["killer_instinct"] = 5.0
+                    p["combo_mastery"] = max(p.get("combo_mastery", 1.6), 4.5)
+                    p["flow_mastery"] = max(p.get("flow_mastery", 1.6), 5.0)
+                    p["offstage_aggression"] = min(1.25, max(1.0, float(p.get("offstage_aggression", 1.15))))
+                    p["endorphin_resilience"] = max(p.get("endorphin_resilience", 1.55), 4.0)
+                    p["pain_tolerance"] = max(p.get("pain_tolerance", 1.5), 4.0)
+                    print(f"💾 [Memoria Persistente] ¡Memoria cargada con éxito! Control de borde activo ({default_memory['edge_fear']:.2f}x), Adicción a ganar: {p.get('win_addiction', 5.0):.1f}x.")
             except Exception as e:
                 print(f"⚠️ [Memoria] Error leyendo memoria persistente: {e}. Inicializando base.")
                 
         self.long_term_memory = default_memory
+        self._stats_cache = None
+        self._stats_cache_frame = -1
+
+    def _compute_cluster_stats(self, current_frame=0, character="LUIGI"):
+        if getattr(self, "_stats_cache", None) is not None and getattr(self, "_stats_cache_frame", None) == current_frame and self._stats_cache.get("character") == character:
+            return self._stats_cache
+
+        spikes_c0_c1 = int(self.spikes[self.map_vis_left_retina].sum() + self.spikes[self.map_vis_right_retina].sum()) if hasattr(self, "map_vis_left_retina") else 0
+        spikes_c2    = int(self.spikes[self.map_mech_hitlag].sum() + self.spikes[self.map_mech_shield_stun].sum()) if hasattr(self, "map_mech_hitlag") else 0
+        spikes_c3    = int(self.spikes[self.map_pam].sum() + self.spikes[self.map_ppl1].sum()) if hasattr(self, "map_ppl1") else int(self.spikes[self.map_pam].sum())
+        spikes_c4    = int(self.spikes[self.map_attack].sum() + self.spikes[self.map_special].sum())
+        spikes_c5    = int(self.spikes[self.map_gf].sum() + self.spikes[self.map_cx_saccade].sum())
+        spikes_c6    = int(self.spikes[self.map_powershield].sum() + self.spikes[self.map_cqc_counter].sum()) if hasattr(self, "map_powershield") else int(self.spikes[self.map_cqc_counter].sum())
+        spikes_c7    = int(self.spikes[self.map_combo].sum() + self.spikes[self.map_combo_fastfaller].sum())
+        total_spikes = int(self.spikes.sum())
+
+        is_flow = bool(self.dopamine >= 0.70 and (getattr(self, "combo_count", 0) >= 3 or getattr(self, "endorphin", 0.50) >= 0.60))
+        cur_endo = float(getattr(self, "endorphin", 0.50))
+        if is_flow:
+            cur_endo = max(cur_endo, 0.80)
+
+        stats = {
+            "dopamine": float(self.dopamine),
+            "octopamine": float(self.octopamine),
+            "endorphin": cur_endo,
+            "flow_state": is_flow,
+            "win_addiction": float(self.get_plasticity("win_addiction", 5.0)),
+            "total_spikes": total_spikes,
+            "neural_activation": f"{(total_spikes / max(1, self.num_neurons)) * 100:.2f}%",
+            "cluster_activity": {
+                "C0_C1_Visual": spikes_c0_c1,
+                "C2_Mechanosensory": spikes_c2,
+                "C3_Central_Complex": spikes_c3,
+                "C4_VNC_Motor": spikes_c4,
+                "C5_Giant_Fiber_SDI": spikes_c5,
+                "C6_Precision_20XX": spikes_c6,
+                "C7_Cerebellar_Combos": spikes_c7
+            },
+            "jump_p": int(self.spikes[self.map_jump].sum()),
+            "attack_p": int(self.spikes[self.map_attack].sum()),
+            "special_p": int(self.spikes[self.map_special].sum()),
+            "shield_p": int(self.spikes[self.map_shield].sum()),
+            "combo_p": int(self.spikes[self.map_combo].sum()),
+            "gf_p": int(self.spikes[self.map_gf].sum()),
+            "left_p": int(self.spikes[self.map_left].sum()) if hasattr(self, "map_left") else 0,
+            "right_p": int(self.spikes[self.map_right].sum()) if hasattr(self, "map_right") else 0,
+            "character": character
+        }
+        self._stats_cache = stats
+        self._stats_cache_frame = current_frame
+        return stats
 
     def get_plasticity(self, param, default=1.0):
         """Obtiene un factor de neuroplasticidad sináptica aprendido en memoria biológica."""
@@ -254,14 +334,26 @@ class FlyBrain:
         return float(p.get(param, default))
 
     def save_long_term_memory(self):
-        """Guarda permanentemente las adaptaciones sinápticas y el aprendizaje en disco."""
-        try:
-            temp_file = self.memory_dir / "long_term_synapses.tmp"
-            with open(temp_file, "w") as f:
-                json.dump(self.long_term_memory, f, indent=2)
-            temp_file.replace(self.memory_file)
-        except Exception as e:
-            print(f"❌ [Memoria] Error al guardar memoria a largo plazo: {e}")
+        """Guarda permanentemente las adaptaciones sinápticas y el aprendizaje en disco en segundo plano (0 lag)."""
+        import copy
+        mem_snapshot = copy.deepcopy(self.long_term_memory)
+        def _bg_save(mem_data):
+            temp_file = None
+            try:
+                self.memory_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = self.memory_dir / f"long_term_synapses_{threading.get_ident()}_{time.time_ns()}.tmp"
+                with open(temp_file, "w") as f:
+                    json.dump(mem_data, f, indent=2)
+                temp_file.replace(self.memory_file)
+            except Exception as e:
+                print(f"❌ [Memoria] Error al guardar memoria a largo plazo: {e}")
+                if temp_file and temp_file.exists():
+                    try:
+                        temp_file.unlink()
+                    except Exception:
+                        pass
+        t = threading.Thread(target=_bg_save, args=(mem_snapshot,), daemon=True)
+        t.start()
 
     def learn_opponent_habit(self, habit_name, val=1, save_disk=False):
         """Registra hábitos del rival (Techs, Ledge options, escudo) para predicción adaptativa."""
@@ -276,33 +368,40 @@ class FlyBrain:
             self.save_long_term_memory()
 
     def learn_from_error(self, error_type, severity=1.0):
-        """Plasticidad sináptica negativa (LTD y adaptación defensiva)."""
+        """Plasticidad sináptica adaptativa: Transmuta errores en furia depredadora y aprendizaje de supervivencia."""
+        p = self.long_term_memory.setdefault("synaptic_plasticity", {})
+        p["loss_aversion_fury"] = min(5.0, p.get("loss_aversion_fury", 5.0) + 0.05)
+        p["win_addiction"] = min(5.0, p.get("win_addiction", 5.0) + 0.05)
+        p["killer_instinct"] = min(5.0, p.get("killer_instinct", 5.0) + 0.05)
+        if error_type == "MATCH_LOST":
+            self.long_term_memory["edge_fear"] = 1.0
+        else:
+            self.long_term_memory["edge_fear"] = min(1.30, max(1.0, self.long_term_memory.get("edge_fear", 1.0)))
+
         if error_type == "DEATH_OFFSTAGE":
-            self.long_term_memory["total_deaths"] += 1
-            self.long_term_memory["learned_errors"]["offstage_falls"] += 1
-            self.long_term_memory["edge_fear"] = min(1.30, self.long_term_memory["edge_fear"] + 0.02 * severity)
-            self.long_term_memory["synaptic_plasticity"]["escape_reflex"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("escape_reflex", 1.50) + 0.05)
+            p["escape_reflex"] = min(5.0, p.get("escape_reflex", 1.50) + 0.08)
+            p["recovery_iq"] = min(5.0, p.get("recovery_iq", 1.50) + 0.08)
+            p["offstage_aggression"] = max(1.0, min(1.25, p.get("offstage_aggression", 1.15) - 0.05))
             self.save_long_term_memory()
 
         elif error_type == "DAMAGE_TAKEN":
-            self.long_term_memory["learned_errors"]["damage_absorbed"] += float(severity)
-            self.long_term_memory["synaptic_plasticity"]["laser_pressure"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("laser_pressure", 1.25) + 0.005 * severity)
+            p["laser_pressure"] = min(5.0, p.get("laser_pressure", 1.25) + 0.005 * severity)
+            p["cqc_counter_reflex"] = min(5.0, p.get("cqc_counter_reflex", 1.50) + 0.04)
 
         elif error_type == "GRABBED_IN_NEUTRAL":
-            self.long_term_memory["learned_errors"]["grabbed_in_neutral"] = self.long_term_memory["learned_errors"].get("grabbed_in_neutral", 0) + 1
-            p = self.long_term_memory["synaptic_plasticity"]
             p["shield_reaction"] = min(5.0, p.get("shield_reaction", 1.40) + 0.08)
             p["cqc_counter_reflex"] = min(5.0, p.get("cqc_counter_reflex", 1.50) + 0.08)
             p["shine_counter"] = min(5.0, p.get("shine_counter", 1.30) + 0.08)
             self.save_long_term_memory()
 
         elif error_type == "SHIELD_BREAK":
-            self.long_term_memory["learned_errors"]["shield_breaks"] = self.long_term_memory["learned_errors"].get("shield_breaks", 0) + 1
             self.save_long_term_memory()
 
         elif error_type == "MATCH_LOST":
-            self.long_term_memory["edge_fear"] = min(1.30, self.long_term_memory["edge_fear"] + 0.02)
-            self.long_term_memory["synaptic_plasticity"]["cqc_counter_reflex"] = min(5.0, self.long_term_memory["synaptic_plasticity"].get("cqc_counter_reflex", 1.50) + 0.06)
+            # Rechazo absoluto a perder: dispara furia y maestría letal de combos para la revancha
+            p["combo_mastery"] = min(5.0, p.get("combo_mastery", 1.60) + 0.15)
+            p["cqc_counter_reflex"] = min(5.0, p.get("cqc_counter_reflex", 1.50) + 0.10)
+            p["loss_aversion_fury"] = 5.0
             self.save_long_term_memory()
 
     def learn_matchup(self, char_name, won=True, kos=4, combos=6):
@@ -325,12 +424,16 @@ class FlyBrain:
         max_p = 5.0
         if success_type == "KO":
             self.long_term_memory["total_kos"] += 1
+            p["win_addiction"] = min(max_p, p.get("win_addiction", 5.0) + 0.10)
+            p["killer_instinct"] = min(max_p, p.get("killer_instinct", 5.0) + 0.10)
             p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.40) + 0.08)
             p["edgeguard_mastery"] = min(max_p, p.get("edgeguard_mastery", 1.50) + 0.08)
-            p["offstage_aggression"] = min(max_p, p.get("offstage_aggression", 1.45) + 0.08)
+            p["offstage_aggression"] = min(1.25, max(1.0, p.get("offstage_aggression", 1.15) + 0.02))
             p["fastfaller_punish"] = min(max_p, p.get("fastfaller_punish", 1.60) + 0.04)
-            # El éxito reduce la vacilación en el borde
-            self.long_term_memory["edge_fear"] = max(1.05, self.long_term_memory.get("edge_fear", 1.15) - 0.03)
+            p["endorphin_resilience"] = min(max_p, p.get("endorphin_resilience", 1.55) + 0.06)
+            p["pain_tolerance"] = min(max_p, p.get("pain_tolerance", 1.50) + 0.05)
+            p["flow_mastery"] = min(max_p, p.get("flow_mastery", 1.65) + 0.06)
+            self.long_term_memory["edge_fear"] = 1.0
             if verbose or getattr(self, "verbose_learning", False):
                 print(f"🧠 [Aprendizaje de Éxito] ¡K.O. consolidado en memoria! Total KOs: {self.long_term_memory['total_kos']}. Maestría combo: {p['combo_mastery']:.2f}x.")
             self.save_long_term_memory()
@@ -377,8 +480,16 @@ class FlyBrain:
             p["shdl_mastery"] = min(max_p, p.get("shdl_mastery", 1.40) + 0.06)
             p["laser_pressure"] = min(max_p, p.get("laser_pressure", 1.25) + 0.06)
 
-        elif success_type == "CQC_COUNTER":
+        elif success_type in ["CQC_COUNTER", "CROUCH_CANCEL"]:
             p["cqc_counter_reflex"] = min(max_p, p.get("cqc_counter_reflex", 1.50) + 0.07)
+            p["pain_tolerance"] = min(max_p, p.get("pain_tolerance", 1.50) + 0.06)
+            p["endorphin_resilience"] = min(max_p, p.get("endorphin_resilience", 1.55) + 0.05)
+            self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + 0.18)
+
+        elif success_type == "SURVIVAL_CLUTCH":
+            p["pain_tolerance"] = min(max_p, p.get("pain_tolerance", 1.50) + 0.08)
+            p["endorphin_resilience"] = min(max_p, p.get("endorphin_resilience", 1.55) + 0.08)
+            self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + 0.25)
 
         elif success_type == "PUMMEL":
             p["grab_combo_lethality"] = min(max_p, p.get("grab_combo_lethality", 1.70) + 0.05 * value)
@@ -409,16 +520,24 @@ class FlyBrain:
         elif success_type == "POWERSHIELD":
             p["powershield_mastery"] = min(max_p, p.get("powershield_mastery", 1.70) + 0.08 * value)
             p["shield_reaction"] = min(max_p, p.get("shield_reaction", 1.40) + 0.06 * value)
+            p["endorphin_resilience"] = min(max_p, p.get("endorphin_resilience", 1.55) + 0.05 * value)
+            self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + 0.20)
 
         elif success_type == "SHIELD_DROP":
             p["shield_drop_iq"] = min(max_p, p.get("shield_drop_iq", 1.65) + 0.08 * value)
             p["platform_shark_iq"] = min(max_p, p.get("platform_shark_iq", 1.55) + 0.06 * value)
+            p["endorphin_resilience"] = min(max_p, p.get("endorphin_resilience", 1.55) + 0.05 * value)
+            self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + 0.15)
 
         elif success_type == "DAMAGE_DEALT":
             p["combo_mastery"] = min(max_p, p.get("combo_mastery", 1.60) + 0.005 * value)
 
         elif success_type == "MATCH_WON":
             self.long_term_memory["matches_won"] += 1
+            p["win_addiction"] = min(max_p, p.get("win_addiction", 5.0) + 0.15)
+            p["flow_mastery"] = min(max_p, p.get("flow_mastery", 5.0) + 0.10)
+            self.dopamine = 1.0
+            self.endorphin = 1.0
             self.save_long_term_memory()
 
     def realtime_memory_train(self, player, opponent, current_frame=0):
@@ -692,9 +811,10 @@ class FlyBrain:
         self.refractory = np.zeros(self.num_neurons, dtype=np.int32)
         self.spikes = np.zeros(self.num_neurons, dtype=np.float32)
         
-        # Sistema Neuromodulador Biológico (Drosophila PAM/PPL1)
-        self.dopamine = 0.65
+        # Sistema Neuromodulador Biológico (Adicción a Ganar & Flow State Depredador)
+        self.dopamine = 0.85
         self.octopamine = 0.20
+        self.endorphin = 0.50
         self.prev_p1_stock = 4
         self.prev_p2_stock = 4
         self.prev_p1_percent = 0.0
@@ -742,6 +862,8 @@ class FlyBrain:
         self.shoryuken_frame = -100
         self.luigi_jump_action = None
         self.luigi_jump_frame = -100
+        self.luigi_wd_dir = 0.5
+        self.halo_descent_active = False
         self.missile_charge_timer = 0
         self.missile_charge_frame = -100
         self.grab_pummel_count = 0
@@ -749,6 +871,12 @@ class FlyBrain:
         self.jab_reset_frame = -100
         self.whiff_punish_state = None
         self.whiff_punish_frame = -100
+        self.powershield_state = None
+        self.running_jc_state = None
+        self.drill_waveshine_state = None
+        self.techchase_fox_state = None
+        self.fox_dash_state = None
+        self.prev_p1_grabbed = False
         self.chaingrab_count = 0
         self.luigi_ledge_state = None
         self.luigi_ledge_timer = 0
@@ -769,22 +897,39 @@ class FlyBrain:
 
     def stimulate_sensory(self, threat_level, rel_x=0.0, rel_y=0.0, is_offstage=False, looming_rate=0.0, player=None, opponent=None, current_frame=0):
         """Inyecta corriente en las neuronas sensoriales y modula la neuroquímica con premios y castigos biológicos."""
+        stock_lost_this_frame = False
         if player is not None and opponent is not None:
             # 1. Castigo por muerte y reajuste de combate
             current_p1_stock = int(getattr(player, "stock", self.prev_p1_stock))
             if current_p1_stock > self.prev_p1_stock:
                 self.prev_p1_stock = current_p1_stock
             elif current_p1_stock < self.prev_p1_stock and self.prev_p1_stock > 0:
-                self.dopamine = 0.50
-                self.octopamine = 0.80
+                stock_lost_this_frame = True
+                # ADICCIÓN A GANAR & RECHAZO TOTAL DE LA DEPRESIÓN:
+                # Perder una vida no genera tristeza ni parálisis, sino una rabia depredadora extrema y hambre feroz de victoria
+                self.dopamine = 0.85          # Dopamina disparada por síndrome de abstinencia y obsesión por recuperar la ventaja
+                self.octopamine = 1.00        # Alerta máxima y reflejos de combate supersónicos
+                self.endorphin = 0.70         # Estado analgésico inquebrantable (cero shock, cero miedo)
                 self.combo_count = 0
                 self.combo_state = None
-                self.death_penalty_frames = 15
+                self.death_penalty_frames = 0 # CERO FRAMES DE DEPRESIÓN
+                self.halo_descent_active = True
+                self.luigi_jump_action = None
+                self.luigi_wd_dir = 0.5
+                self.missile_charging = False
+                self.missile_charge_timer = 0
+                self.whiff_punish_state = None
+                self.powershield_state = None
+                self.edgeguard_state = None
+                self.running_jc_state = None
+                self.drill_waveshine_state = None
+                self.techchase_fox_state = None
+                self.fox_dash_state = None
                 self.voltage[:] = 0.0
                 self.prev_p1_stock = current_p1_stock
                 self.learn_from_error("DEATH_OFFSTAGE")
                 char_str = str(getattr(player, "character", getattr(self, "active_character", "LUIGI"))).split(".")[-1].upper()
-                print(f"💀 [FlyBrain] ¡{char_str} HA PERDIDO UNA VIDA ({current_p1_stock}⭐)! Reenganchando combate ofensivo.")
+                print(f"🔥 [FlyBrain] ¡PÉRDIDA DE STOCK RECHAZADA! {char_str} ({current_p1_stock}⭐) activa ADICCIÓN A GANAR AL 100%: MODO VENGANZA DEPREDADORA.")
             else:
                 self.prev_p1_stock = current_p1_stock
 
@@ -794,12 +939,13 @@ class FlyBrain:
                 self.prev_p2_stock = current_p2_stock
             elif current_p2_stock < self.prev_p2_stock and self.prev_p2_stock > 0:
                 self.dopamine = 1.0           # 100% DOPAMINA: ÉXITO ABSOLUTO
+                self.endorphin = max(0.80, min(1.0, getattr(self, "endorphin", 0.70) + 0.25)) # Éxtasis de victoria
                 self.octopamine = 0.10
                 self.combo_count += 3
                 self.consecutive_combos += 1
                 self.prev_p2_stock = current_p2_stock
                 self.learn_from_success("KO")
-                print(f"⭐ [FlyBrain] ¡K.O. LOGRADO! Rival eliminado ({current_p2_stock}⭐). DOPAMINA AL 100% (Modo Depredador).")
+                print(f"🏆 [FlyBrain] ¡K.O. LOGRADO! Rival eliminado ({current_p2_stock}⭐). DOPAMINA AL 100% (Adicción a Ganar Satisfecha).")
             else:
                 self.prev_p2_stock = current_p2_stock
 
@@ -813,7 +959,7 @@ class FlyBrain:
                 self.learn_from_success("DAMAGE_DEALT", value=delta_p2)
                 
                 combo_multiplier = 1.0 + min(3.0, self.combo_count * 0.4)
-                dopamine_gain = (delta_p2 * 0.03 + 0.15) * combo_multiplier
+                dopamine_gain = (delta_p2 * 0.04 + 0.22) * combo_multiplier
                 
                 if self.combo_state in ["UPTHROW_UAIR", "UPTHROW_JUMP", "LUIGI_DTHROW_COMBO"]:
                     dopamine_gain += 0.40
@@ -848,15 +994,20 @@ class FlyBrain:
             is_p1_grabbed = (p1_act_val in range(223, 233)) or ("CAPTURE" in p1_act_str) or ("THROWN" in p1_act_str)
             if is_p1_grabbed and not getattr(self, "prev_p1_grabbed", False):
                 self.learn_from_error("GRABBED_IN_NEUTRAL")
-                self.dopamine = max(0.35, self.dopamine - 0.15)
+                self.dopamine = min(1.0, max(0.85, self.dopamine + 0.05)) # Furiosa aversión a ser agarrado
+                self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + 0.25) # Resiliencia de acero
                 self.octopamine = 1.0 # Alerta máxima para escape
             self.prev_p1_grabbed = is_p1_grabbed
 
             p1_pct = float(getattr(player, "percent", self.prev_p1_percent))
             delta_p1 = p1_pct - self.prev_p1_percent
             if delta_p1 > 0:
-                self.dopamine = max(0.40, self.dopamine - delta_p1 * 0.012)
-                self.octopamine = min(1.0, self.octopamine + delta_p1 * 0.03 + 0.10)
+                # El daño recibido NO deprime: activa el circuito de Furia por Aversión a Perder
+                self.dopamine = min(1.0, max(0.85, self.dopamine + delta_p1 * 0.005))
+                self.octopamine = min(1.0, self.octopamine + delta_p1 * 0.03 + 0.15)
+                # Liberación masiva de endorfinas (analgesia natural y tenacidad bajo dolor severo)
+                endorphin_surge = min(0.35, (delta_p1 * 0.02 + 0.10) * (1.0 + p1_pct / 100.0))
+                self.endorphin = min(1.0, getattr(self, "endorphin", 0.50) + endorphin_surge)
                 self.combo_count = 0
                 self.combo_state = None
                 self.learn_from_error("DAMAGE_TAKEN", severity=delta_p1)
@@ -866,17 +1017,44 @@ class FlyBrain:
             was_offstage = getattr(self, "prev_was_offstage", False)
             if was_offstage and not is_offstage:
                 self.learn_from_success("SAFE_RECOVERY")
+                self.endorphin = min(1.0, getattr(self, "endorphin", 0.65) + 0.25)
+                self.dopamine = min(1.0, self.dopamine + 0.15)
             self.prev_was_offstage = is_offstage
 
             # Alerta de supervivencia si está fuera de escenario
             if is_offstage:
                 self.octopamine = 1.0
 
-        if self.death_penalty_frames > 0:
+        if stock_lost_this_frame:
+            pass
+        elif self.death_penalty_frames > 0:
             self.death_penalty_frames -= 1
         else:
-            self.dopamine = max(0.50, self.dopamine * 0.999)
-            self.octopamine = max(0.18, self.octopamine * 0.993)
+            # Homeostasis biológica de Adicción a Ganar: Baseline depredador 0.75
+            baseline_da = 0.75
+            if self.dopamine > baseline_da:
+                self.dopamine = max(baseline_da, self.dopamine * 0.999)
+            elif self.dopamine < baseline_da:
+                self.dopamine = min(baseline_da, self.dopamine + 0.005)
+
+            # Homeostasis de Endorfinas de Campeón (0.50 base, se eleva a >0.80 en combate/Flow State)
+            baseline_endo = 0.50
+            cur_endo = getattr(self, "endorphin", baseline_endo)
+            if cur_endo > baseline_endo:
+                self.endorphin = max(baseline_endo, cur_endo * 0.998)
+            elif cur_endo < baseline_endo:
+                self.endorphin = min(baseline_endo, cur_endo + 0.004)
+
+            # Disipación de Octopamina hacia su nivel base 0.20
+            if self.octopamine > 0.20:
+                self.octopamine = max(0.20, self.octopamine * 0.994)
+            elif self.octopamine < 0.20:
+                self.octopamine = min(0.20, self.octopamine + 0.001)
+
+        # Clamping de seguridad fisiológica: Cero depresión (piso 0.60)
+        self.dopamine = max(0.60, min(1.0, float(self.dopamine)))
+        self.endorphin = max(0.50, min(1.0, float(getattr(self, "endorphin", 0.50))))
+        self.octopamine = max(0.05, min(1.0, float(self.octopamine)))
         
         n_sensory = len(self.sensory_neurons)
         half = n_sensory // 2
@@ -918,6 +1096,8 @@ class FlyBrain:
                 input_current[self.map_mech_tumble[:700]] += 4.8
             if is_p1_grabbed:
                 input_current[self.map_mech_grab[:900]] += 6.0
+            # Modulación opioide endorfinérgica (analgesia / antinocicepción / estabilidad frente al hitlag)
+            input_current[self.map_mech_hitlag[:600]] += getattr(self, "endorphin", 0.50) * 2.5
 
         # Cluster 3: Complejo Central (CX) & Neuromoduladores PAM/PPL1
         dopamine_gain = self.dopamine * 2.5
@@ -966,6 +1146,8 @@ class FlyBrain:
             is_projectile = any(k in opp_act_str for k in ["LASER", "BLASTER", "MISSILE", "SPECIAL_N", "SPECIAL_S", "ITEM_THROW", "PILL", "TURNIP", "CHARGE_SHOT"]) or (opp_act_val in [341, 342, 343, 344, 345, 348, 349, 350])
             if is_projectile and hasattr(self, "map_powershield"):
                 input_current[self.map_powershield[:800]] += 5.5
+            if hasattr(self, "map_powershield"):
+                input_current[self.map_powershield[:600]] += getattr(self, "endorphin", 0.50) * 2.0
             if BattlefieldMap.is_on_platform(px_val, py_val - 3.0) is not None:
                 if hasattr(self, "map_shield_drop"):
                     input_current[self.map_shield_drop[:600]] += 4.0
@@ -989,16 +1171,21 @@ class FlyBrain:
         return input_current
 
     def step(self, external_current=None):
-        """Avanza 1 paso LIF recurrente en el conectoma biológico completo en ~3.5 ms con CSC."""
+        """Avanza 1 paso LIF recurrente en el conectoma biológico completo en ~1.5 - 3.5 ms con CSC."""
         self.voltage = self.voltage * self.decay
         
         if external_current is not None:
             self.voltage += external_current
             
-        # Multiplicación hiper-rápida de sinapsis usando CSC solo en columnas activas
+        # Multiplicación hiper-rápida de sinapsis usando CSC con muestreo adaptativo en columnas activas
         active_neurons = np.flatnonzero(self.spikes)
         if active_neurons.size > 0:
-            synaptic_input = np.asarray(self.W_csc[:, active_neurons].sum(axis=1)).ravel()
+            if active_neurons.size > 1500:
+                stride = active_neurons.size // 1500 + 1
+                sample = active_neurons[::stride]
+                synaptic_input = np.asarray(self.W_csc[:, sample].sum(axis=1)).ravel()
+            else:
+                synaptic_input = np.asarray(self.W_csc[:, active_neurons].sum(axis=1)).ravel()
             self.voltage += synaptic_input
             
         # Estabilidad biológica y numérica garantizada
@@ -1017,30 +1204,62 @@ class FlyBrain:
     def _enforce_safety(self, action, player, opponent, stage_edge=68.4):
         """
         BARRERA DE SEGURIDAD ABSOLUTA (ZERO SUICIDE GUARANTEE OMNI-STAGE):
-        1. Si Fox está en el suelo y se aproxima a la repisa (distancia < 14 unidades):
-           - Inhabilita sprints, Dash Attacks y ataques hacia el abismo.
-           - Aplica freno inmediato / retroceso hacia el centro.
-        2. Si Fox está en el aire sobre el escenario en los extremos:
-           - Aplica drift aéreo forzado hacia el centro y caída rápida para tocar suelo.
+        1. En el suelo:
+           - Si la distancia al borde es < 24 unidades y el stick o velocidad se dirigen al abismo:
+             cancela saltos hacia el vacío, cancela especiales hacia afuera, invierte el stick hacia adentro (dir_to_stage)
+             y aplica crouch (stick_y = 0.0) para matar inercia por fricción en 1 frame.
+           - Si la distancia al borde es < 10 unidades: bloqueo estricto al centro (crouch + stick inward, cero taunts).
+           - Prohíbe Side-B (Green Missile / Fox Illusion) hacia el abismo si falta pista (< 55u).
+        2. En el aire sobre el escenario:
+           - En los extremos (|px| > stage_edge - 18.0), fuerza drift aéreo hacia el centro (dir_to_stage)
+             y cancela caída rápida suicida (stick_y >= 0.5) para aterrizar seguro en el escenario.
+           - Prohíbe airdodges o especiales que arrojen al personaje fuera del escenario.
         3. En el aire fuera de escenario:
-           - Inhabilita el botón de escudo (evita Air Dodge suicida).
+           - Prohíbe terminantemente el escudo (cero airdodges suicidas).
+           - Garantiza recuperación inteligente (doble salto hacia el escenario -> Up-B sweetspot / Rising Cyclone).
         """
         if player is None:
             return action
 
-        px = player.position.x
-        py = player.position.y
+        px = float(player.position.x)
+        py = float(player.position.y)
         on_ground = getattr(player, "on_ground", True)
+        dir_to_stage = 1.0 if px < 0 else 0.0
+        dist_to_edge = float(stage_edge - abs(px))
 
         # Detección del personaje activo (Fox o Luigi)
         char_name = str(getattr(player, "character", getattr(self, "active_character", "LUIGI"))).upper()
         is_fox = "FOX" in char_name and "LUIGI" not in char_name
         is_luigi = not is_fox
 
-        # EXCEPCIÓN CONTROLADA: Si Fox tiene activada la caza fuera de plataforma (Offstage Chase)
-        # Fox puede salir deliberadamente a rematar (Shine-spike / B-Air wall) si y solo si:
-        # Tiene su doble salto disponible (player.jumps_left > 0) y altura segura.
-        if action.get("_allow_offstage_chase", False) and getattr(player, "jumps_left", 0) > 0 and py > -25.0:
+        # Velocidades físicas reales del personaje en Melee
+        speed_x = float(getattr(player, "speed_ground_x_self", 0.0) if on_ground else getattr(player, "speed_air_x_self", 0.0))
+
+        # PROTECCIÓN DE RESPAWN & DESCENSO SEGURO DE HALO:
+        is_respawn_invuln = getattr(player, "invulnerability_left", 0) > 30 or getattr(self, "halo_descent_active", False)
+        if is_respawn_invuln:
+            action["_allow_offstage_chase"] = False
+            action["_allow_air_shield"] = False
+            if not on_ground:
+                action["shield"] = False
+
+        # CONTROL ESTRICTO DE OFFSTAGE CHASE (PREVENCIÓN DE SALTO SUICIDA AL ABISMO):
+        if action.get("_allow_offstage_chase", False):
+            # Para Luigi: Tracción 0.005 y baja velocidad aérea le impiden salir del perímetro seguro del escenario.
+            if is_luigi:
+                # Si Luigi está cerca del borde o en el aire, forzar drift SIEMPRE hacia el escenario
+                if abs(px) >= (stage_edge - 6.0) or not on_ground:
+                    action["stick_x"] = float(dir_to_stage)
+                # Si ya cruzó el borde o no le queda doble salto: abortar persecución para recuperación inmediata
+                if abs(px) >= stage_edge or getattr(player, "jumps_left", 0) <= 0 or py < -4.0:
+                    action["_allow_offstage_chase"] = False
+            elif is_fox:
+                # Para Fox: solo permitir persecución controlada si tiene doble salto y altura segura (py >= -8.0)
+                if abs(px) > (stage_edge + 10.0) or py < -8.0 or getattr(player, "jumps_left", 0) <= 0:
+                    action["_allow_offstage_chase"] = False
+
+        # Si aún tiene _allow_offstage_chase activo (dentro de zona 100% segura):
+        if action.get("_allow_offstage_chase", False) and getattr(player, "jumps_left", 0) > 0 and py > -12.0 and abs(px) <= (stage_edge + 8.0):
             if not on_ground and not action.get("_allow_air_shield", False):
                 action["shield"] = False
             action["stick_x"] = float(action.get("stick_x", 0.5))
@@ -1048,122 +1267,277 @@ class FlyBrain:
             action["c_stick_x"] = float(action.get("c_stick_x", 0.5))
             action["c_stick_y"] = float(action.get("c_stick_y", 0.5))
             return action
+        else:
+            action["_allow_offstage_chase"] = False
 
-        # En el aire: Prohibir escudo salvo si se autoriza explícitamente para L-Cancel o Wavedash
+        # BARRERA ESTRICTA ANTI-SUICIDIO POR WAVEDASH / AIRDODGE PARA LUIGI (0.005 TRACTION):
+        if is_luigi:
+            stick_x_val = float(action.get("stick_x", 0.5))
+            jump_intent = getattr(self, "luigi_jump_action", None)
+            
+            # A) Cancelar Wavedash terrestre o jumpsquat hacia el abismo si falta pista (runway < 45.0)
+            if jump_intent in ["WAVEDASH", "WAVEDASH_BACK"] or (on_ground and action.get("jump", False) and "WAVEDASH" in action.get("name", "")):
+                wd_dir = getattr(self, "luigi_wd_dir", stick_x_val)
+                runway = (stage_edge - px) if wd_dir > 0.5 else (stage_edge + px)
+                is_outward_wd = (wd_dir > 0.5 and px >= -15.0) or (wd_dir < 0.5 and px <= 15.0)
+                if runway < 45.0 and is_outward_wd:
+                    self.luigi_jump_action = None
+                    action["jump"] = False
+                    action["shield"] = False
+                    action["stick_x"] = float(dir_to_stage)
+                    action["stick_y"] = 0.0 # Crouch-brake
+                    action["name"] = "🛑 BARRERA ANTI-SUICIDIO: WAVEDASH AL ABISMO PREVENIDO (PISTA INSUFICIENTE < 45u)"
+            elif on_ground and not action.get("jump", False):
+                # Limpiar intención de salto si la acción actual en tierra no es un salto ni jumpsquat
+                if "KNEE_BEND" not in str(getattr(player, "action", "")):
+                    self.luigi_jump_action = None
+
+            # B) Cancelar Airdodge / Waveland diagonal en el aire hacia el abismo (runway < 35.0 o cerca del borde)
+            if not on_ground and (action.get("shield", False) or action.get("_allow_air_shield", False)):
+                runway = (stage_edge - px) if stick_x_val > 0.5 else (stage_edge + px)
+                is_outward = (stick_x_val > 0.5 and px > 0) or (stick_x_val < 0.5 and px < 0)
+                if is_outward and (runway < 35.0 or abs(px) > (stage_edge - 14.0)):
+                    action["shield"] = False
+                    action["_allow_air_shield"] = False
+                    action["stick_x"] = float(dir_to_stage)
+                    action["stick_y"] = 0.5
+                    action["name"] = "🛑 BARRERA ANTI-SUICIDIO: AIRDODGE AL ABISMO PREVENIDO"
+
+        # En el aire: Prohibir escudo salvo si se autoriza explícitamente para L-Cancel o Wavedash seguro
         if not on_ground and not action.get("_allow_air_shield", False):
             action["shield"] = False
 
-        # --- A) EN EL SUELO: CONTROL ESTRICTO DE BORDES Y PODERES SUICIDAS ---
+        # --- A) EN EL SUELO: CONTROL ESTRICTO DE BORDES, MOMENTUM Y PODERES SUICIDAS ---
         if on_ground and py >= -2.0:
-            # Los lanzamientos (Throws) son animaciones terrestres fijas; no deben frenar el stick de lanzamiento
             if "THROW" in action.get("name", ""):
                 return action
 
+            stick_x_in = float(action.get("stick_x", 0.5))
+
+            # SEGURIDAD ANTI-CAÍDA EN PLATAFORMAS FLOTANTES LATERALES:
+            if 18.0 <= py <= 35.0:
+                if px >= 46.0 and (stick_x_in > 0.5 or speed_x > 0.15):
+                    action["stick_x"] = 0.15
+                    action["stick_y"] = 0.0
+                    action["jump"] = False
+                    action["name"] = "🛑 BARRERA ANTI-CAÍDA EN PLATAFORMA: RETORNO SEGURO AL ESCENARIO"
+                elif px <= -46.0 and (stick_x_in < 0.5 or speed_x < -0.15):
+                    action["stick_x"] = 0.85
+                    action["stick_y"] = 0.0
+                    action["jump"] = False
+                    action["name"] = "🛑 BARRERA ANTI-CAÍDA EN PLATAFORMA: RETORNO SEGURO AL ESCENARIO"
+
             # BARRERA ESTRICTA ANTI-SUICIDIO CON GREEN MISSILE PARA LUIGI:
-            # En Melee, Green Missile en tierra tiene un recorrido de 60-80u (o 150u en Misfire).
-            # Si se dispara con menos de 60.0u de pista hacia el borde, Luigi vuela al abismo en SPECIAL_FALL.
             if is_luigi:
-                stick_x_val = action.get("stick_x", 0.5)
-                is_side_b = action.get("special", False) and (0.20 <= action.get("stick_y", 0.5) <= 0.80) and stick_x_val != 0.5
+                # Solo Side-B (Green Missile) cuando stick_y es neutral (|y - 0.5| <= 0.25)
+                # No confundir con Down-B Cyclone (stick_y <= 0.25) ni Up-B Shoryuken (stick_y >= 0.75)
+                is_side_b = action.get("special", False) and (abs(stick_x_in - 0.5) > 0.20) and (abs(float(action.get("stick_y", 0.5)) - 0.5) <= 0.25)
                 if is_side_b:
-                    dist_forward = (stage_edge - px) if stick_x_val > 0.5 else (stage_edge + px)
-                    if dist_forward < 60.0:
+                    dist_forward = (stage_edge - px) if stick_x_in > 0.5 else (stage_edge + px)
+                    if dist_forward < 55.0:
                         action["special"] = False
-                        action["stick_x"] = 0.5 # Freno de seguridad para no correr al abismo
+                        action["stick_x"] = 0.5
                         action["name"] = "🛑 BARRERA ANTI-SUICIDIO: GREEN MISSILE CANCELADO (DISTANCIA AL BORDE INSEGURA)"
 
+            # ZONA DE FRENO DE EMERGENCIA Y ANTI-SLIP (LUIGI 0.005 TRACTION & FOX RUN):
             # 1. BORDE DERECHO (px > 0)
             if px > 0:
                 dist_to_right_edge = stage_edge - px
-                if dist_to_right_edge < 42.0:
-                    # Prohibir Side-B (Green Missile / Illusion) hacia la derecha (hacia el abismo)
-                    if action.get("special", False) and action.get("stick_y", 0.5) < 0.8 and action.get("stick_x", 0.5) > 0.5:
-                        action["special"] = False
-                    # Prohibir Up-B suicida cerca del borde si no está confirmado a quemarropa
-                    if action.get("special", False) and action.get("stick_y", 0.5) > 0.8 and dist_to_right_edge < 16.0:
-                        action["special"] = False
-                        action["attack"] = True
-                        action["stick_y"] = 0.0 # Down-smash seguro en lugar de Up-B al vacío
-                    if action.get("attack", False) and action.get("stick_x", 0.5) > 0.6 and dist_to_right_edge < 12.0:
-                        action["attack"] = False
+                is_outward_dir = (stick_x_in > 0.5)
+                is_outward_mom = (speed_x > 0.15)
+                opp_is_offstage = opponent is not None and (float(opponent.position.x) > stage_edge or getattr(opponent, "off_stage", False))
 
-                    # Si el stick intenta mover hacia el precipicio derecho, frenar y tirar al centro
-                    if action.get("stick_x", 0.5) > 0.5:
-                        if dist_to_right_edge < 8.0:
-                            action["stick_x"] = 0.15 # Freno de emergencia hacia la izquierda
-                            action["stick_y"] = 0.0
-                        else:
-                            action["stick_x"] = 0.35 # Drift suave hacia la izquierda
+                # Prohibir Side-B hacia el abismo cerca del borde
+                if dist_to_right_edge < 45.0 and action.get("special", False) and is_outward_dir:
+                    action["special"] = False
+
+                # Prohibir Up-B Shoryuken en tierra cerca del borde (evita freefall suicida al abismo)
+                if is_luigi and dist_to_right_edge < 18.0 and action.get("special", False) and float(action.get("stick_y", 0.5)) >= 0.75:
+                    action["special"] = False
+                    action["attack"] = True
+                    action["stick_y"] = 0.0
+                    action["name"] = "💥 BORDE SEGURO: CONVERSIÓN DE UP-B A DOWN-SMASH SEMI-SPIKE (CERO FREEFALL)"
+
+                # Excepción de Down-Taunt Meteor Spike en repisa (hitbox frame 45)
+                is_taunt_spike = action.get("taunt", False) and "DOWN-TAUNT METEOR SPIKE" in action.get("name", "")
+                if is_taunt_spike:
+                    action["stick_x"] = 0.5
+                    action["stick_y"] = 0.0
+                    action["jump"] = False
+                    action["special"] = False
+                else:
+                    # Cancelar saltos hacia el abismo si falta pista (< 25.0u) o si hay inercia hacia afuera
+                    if dist_to_right_edge < 25.0 and action.get("jump", False) and (is_outward_dir or is_outward_mom):
+                        action["jump"] = False
+                        self.luigi_jump_action = None
+
+                    # Si el rival está offstage, prohibir saltar al vacío
+                    if opp_is_offstage:
+                        action["jump"] = False
+                        self.luigi_jump_action = None
+
+                    # Freno de inercia o contención en el borde extremo
+                    if is_outward_mom and dist_to_right_edge < 16.0:
+                        action["stick_x"] = 0.0
+                        action["stick_y"] = 0.0
+                        action["jump"] = False
+                        action["attack"] = False
+                        action["special"] = False
+                        action["shield"] = False
+                        action["grab"] = False
+                        action["taunt"] = False
+                        self.luigi_jump_action = None
+                        action["name"] = "🛑 BARRERA ANTI-CAÍDA EN BORDE DERECHO: CROUCH-BRAKE AL CENTRO"
+                    elif dist_to_right_edge < 8.0:
+                        if is_outward_dir:
+                            if not (action.get("attack", False) or action.get("special", False)):
+                                action["stick_x"] = 0.0
+                                action["stick_y"] = 0.0
+                                action["jump"] = False
+                                action["attack"] = False
+                                action["special"] = False
+                                action["shield"] = False
+                                action["grab"] = False
+                                action["taunt"] = False
+                                self.luigi_jump_action = None
+                                action["name"] = "🛑 BARRERA ANTI-CAÍDA EN BORDE DERECHO: CROUCH-BRAKE AL CENTRO"
+                            else:
+                                action["stick_x"] = 0.5 # Neutralizar avance en ataques al borde
 
             # 2. BORDE IZQUIERDO (px < 0)
             elif px < 0:
                 dist_to_left_edge = stage_edge - abs(px)
-                if dist_to_left_edge < 42.0:
-                    # Prohibir Side-B hacia la izquierda (hacia el abismo)
-                    if action.get("special", False) and action.get("stick_y", 0.5) < 0.8 and action.get("stick_x", 0.5) < 0.5:
-                        action["special"] = False
-                    # Prohibir Up-B suicida cerca del borde
-                    if action.get("special", False) and action.get("stick_y", 0.5) > 0.8 and dist_to_left_edge < 16.0:
-                        action["special"] = False
-                        action["attack"] = True
-                        action["stick_y"] = 0.0
-                    if action.get("attack", False) and action.get("stick_x", 0.5) < 0.4 and dist_to_left_edge < 12.0:
-                        action["attack"] = False
+                is_outward_dir = (stick_x_in < 0.5)
+                is_outward_mom = (speed_x < -0.15)
+                opp_is_offstage = opponent is not None and (float(opponent.position.x) < -stage_edge or getattr(opponent, "off_stage", False))
 
-                    # Si el stick intenta mover hacia el precipicio izquierdo, frenar y tirar al centro
-                    if action.get("stick_x", 0.5) < 0.5:
-                        if dist_to_left_edge < 8.0:
-                            action["stick_x"] = 0.85 # Freno de emergencia hacia la derecha
-                            action["stick_y"] = 0.0
-                        else:
-                            action["stick_x"] = 0.65 # Drift suave hacia la derecha
+                if dist_to_left_edge < 45.0 and action.get("special", False) and is_outward_dir:
+                    action["special"] = False
+
+                # Prohibir Up-B Shoryuken en tierra cerca del borde (evita freefall suicida al abismo)
+                if is_luigi and dist_to_left_edge < 18.0 and action.get("special", False) and float(action.get("stick_y", 0.5)) >= 0.75:
+                    action["special"] = False
+                    action["attack"] = True
+                    action["stick_y"] = 0.0
+                    action["name"] = "💥 BORDE SEGURO: CONVERSIÓN DE UP-B A DOWN-SMASH SEMI-SPIKE (CERO FREEFALL)"
+
+                is_taunt_spike = action.get("taunt", False) and "DOWN-TAUNT METEOR SPIKE" in action.get("name", "")
+                if is_taunt_spike:
+                    action["stick_x"] = 0.5
+                    action["stick_y"] = 0.0
+                    action["jump"] = False
+                    action["special"] = False
+                else:
+                    if dist_to_left_edge < 25.0 and action.get("jump", False) and (is_outward_dir or is_outward_mom):
+                        action["jump"] = False
+                        self.luigi_jump_action = None
+
+                    if opp_is_offstage:
+                        action["jump"] = False
+                        self.luigi_jump_action = None
+
+                    if is_outward_mom and dist_to_left_edge < 16.0:
+                        action["stick_x"] = 1.0
+                        action["stick_y"] = 0.0
+                        action["jump"] = False
+                        action["attack"] = False
+                        action["special"] = False
+                        action["shield"] = False
+                        action["grab"] = False
+                        action["taunt"] = False
+                        self.luigi_jump_action = None
+                        action["name"] = "🛑 BARRERA ANTI-CAÍDA EN BORDE IZQUIERDO: CROUCH-BRAKE AL CENTRO"
+                    elif dist_to_left_edge < 8.0:
+                        if is_outward_dir:
+                            if not (action.get("attack", False) or action.get("special", False)):
+                                action["stick_x"] = 1.0
+                                action["stick_y"] = 0.0
+                                action["jump"] = False
+                                action["attack"] = False
+                                action["special"] = False
+                                action["shield"] = False
+                                action["grab"] = False
+                                action["taunt"] = False
+                                self.luigi_jump_action = None
+                                action["name"] = "🛑 BARRERA ANTI-CAÍDA EN BORDE IZQUIERDO: CROUCH-BRAKE AL CENTRO"
+                            else:
+                                action["stick_x"] = 0.5
 
         # --- B) EN EL AIRE SOBRE EL ESCENARIO: DRIFT DE SEGURIDAD Y CERO FREEFALLS ---
         if not on_ground and abs(px) <= stage_edge and py >= -2.0:
             if action.get("special", False):
                 if is_fox:
-                    # En Fox: Shine (Down-B, stick_y < 0.3) es 100% seguro (frame-1, jump-cancel, sin freefall).
-                    # Blaster (Neutral-B, stick_y ~0.5) es seguro para SHDL.
-                    # Prohibir solo Up-B (Fire Fox) en el aire sobre escenario para evitar enorme landing lag:
                     if action.get("stick_y", 0.5) > 0.7:
                         action["special"] = False
                         action["attack"] = True
-                        action["stick_y"] = 0.5 # Convertir a N-Air seguro
+                        action["stick_y"] = 0.5
                 else:
-                    # En Luigi: Cyclone (Down-B, stick_y < 0.3) es seguro (no freefall, mashable).
-                    # Bola de Fuego (Neutral-B) es segura.
-                    # Prohibir Up-B (Shoryuken aéreo) y Side-B en el aire sobre escenario (inducen SPECIAL_FALL suicida):
-                    if action.get("stick_y", 0.5) > 0.7 or (0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5):
+                    is_cyclone = (action.get("stick_y", 0.5) <= 0.25)
+                    is_fireball = (abs(action.get("stick_y", 0.5) - 0.5) < 0.25) and (abs(action.get("stick_x", 0.5) - 0.5) < 0.20)
+                    if not (is_cyclone or is_fireball):
                         action["special"] = False
                         action["attack"] = True
-                        action["stick_y"] = 0.5 # Convertir a N-Air Frame-3 seguro
+                        action["stick_y"] = 0.5
+                        action["stick_x"] = float(dir_to_stage)
+                        action["name"] = "🟢 SEGURIDAD AÉREA: CONVERTIR ESPECIAL RIESGOSO A NAIR SEGURO"
 
-            if px > (stage_edge - 10.0):
-                action["stick_x"] = min(float(action.get("stick_x", 0.5)), 0.20)
-                if py > 6.0 and not action.get("special", False) and not action.get("jump", False):
-                    action["stick_y"] = 0.0 # Fast fall para aterrizar rápido
-            elif px < -(stage_edge - 10.0):
-                action["stick_x"] = max(float(action.get("stick_x", 0.5)), 0.80)
-                if py > 6.0 and not action.get("special", False) and not action.get("jump", False):
-                    action["stick_y"] = 0.0 # Fast fall para aterrizar rápido
+            # Drift aéreo seguro hacia el centro en franja exterior (18 unidades de margen)
+            if px > (stage_edge - 18.0):
+                action["stick_x"] = min(float(action.get("stick_x", 0.5)), 0.15)
+                if action.get("stick_y", 0.5) < 0.30:
+                    action["stick_y"] = 0.5 # Cancelar caída rápida hacia la esquina
+            elif px < -(stage_edge - 18.0):
+                action["stick_x"] = max(float(action.get("stick_x", 0.5)), 0.85)
+                if action.get("stick_y", 0.5) < 0.30:
+                    action["stick_y"] = 0.5
 
         # --- C) EN EL AIRE FUERA DEL ESCENARIO (OFFSTAGE): GARANTÍA DE RECUPERACIÓN INTELIGENTE ---
         if not on_ground and (abs(px) > stage_edge or py < -2.0):
+            action["shield"] = False # CERO AIRDODGES SUICIDAS
+
+            dir_stage = 1.0 if px < 0 else 0.0
             if is_luigi:
-                # Prohibir Side-B (Green Missile) en el aire fuera de escenario: causa FALL_SPECIAL suicida
-                if action.get("special", False) and 0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5:
-                    if py > -18.0:
-                        action["stick_y"] = 0.0 # Convertir a Rising Cyclone seguro (no freefall)
+                if action.get("special", False):
+                    # 1. GREEN MISSILE EN EL AIRE FUERA DEL ESCENARIO (SIDE-B):
+                    if 0.25 <= action.get("stick_y", 0.5) <= 0.75:
+                        stick_x_val = float(action.get("stick_x", 0.5))
+                        is_aimed_inward = (stick_x_val > 0.5 and px < 0) or (stick_x_val < 0.5 and px > 0)
+                        is_high_and_far = abs(px) > (stage_edge + 12.0) and py >= -5.0 and is_aimed_inward
+                        if is_high_and_far:
+                            action["special"] = True
+                            action["stick_x"] = float(dir_stage)
+                            action["stick_y"] = 0.5
+                            action["name"] = "🚀 RECUPERACIÓN GREEN MISSILE OFFSPEED AL ESCENARIO (CHANCE MISFIRE 12.5%)"
+                        else:
+                            action["special"] = True
+                            action["stick_y"] = 0.0
+                            action["stick_x"] = float(dir_stage)
+                            action["name"] = "🌪️ SEGURIDAD OFFSTAGE: CONVERTIR SIDE-B A RISING CYCLONE (CERO FREEFALL)"
+                    # 2. SUPER JUMP PUNCH (UP-B):
+                    elif action.get("stick_y", 0.5) > 0.70:
+                        if getattr(player, "jumps_left", 0) > 0:
+                            action["special"] = False
+                            action["jump"] = True
+                            action["attack"] = False
+                            action["stick_x"] = float(dir_stage)
+                            action["stick_y"] = 0.85
+                            action["name"] = "🪰 PRIORIDAD SALTO DOBLE OFFSTAGE: EVITAR FREEFALL ESPECIAL"
+                        elif abs(px) <= (stage_edge + 3.0):
+                            action["stick_x"] = 0.5 + 0.35 * (1.0 if dir_stage > 0.5 else -1.0)
+                            action["stick_y"] = 1.0
+                        else:
+                            action["special"] = True
+                            action["stick_y"] = 0.0
+                            action["stick_x"] = float(dir_stage)
                     else:
-                        action["stick_y"] = 0.90 # Convertir a Up-B snap a repisa
+                        action["stick_y"] = 0.0
+                        action["stick_x"] = float(dir_stage)
             elif is_fox:
-                # En Fox: Fox Illusion (Side-B) es una opción de recuperación rápida válida cuando py >= -1.0.
-                # Si Fox está muy bajo (py < -1.0) y tenta Side-B, chocaría contra la pared inferior:
                 if action.get("special", False) and 0.25 <= action.get("stick_y", 0.5) <= 0.75 and action.get("stick_x", 0.5) != 0.5:
                     if py < -1.0:
-                        action["stick_y"] = 0.90 # Convertir a Fire Fox Up-B para subir verticalmente a la repisa
+                        action["stick_y"] = 0.90
+                        action["stick_x"] = 0.5
 
-        # Asegurar tipos numéricos para sticks
         action["stick_x"] = float(action.get("stick_x", 0.5))
         action["stick_y"] = float(action.get("stick_y", 0.5))
         action["c_stick_x"] = float(action.get("c_stick_x", 0.5))
@@ -1192,39 +1566,32 @@ class FlyBrain:
            - Tech-chase con Down-Smash semi-spike.
            - Short-Hop Laser pressure a larga distancia.
         """
-        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS)
-        spikes_c0_c1   = int(np.sum(self.spikes[self.map_vis_left_retina]) + np.sum(self.spikes[self.map_vis_right_retina])) if hasattr(self, "map_vis_left_retina") else 0
-        spikes_c2      = int(np.sum(self.spikes[self.map_mech_hitlag]) + np.sum(self.spikes[self.map_mech_shield_stun])) if hasattr(self, "map_mech_hitlag") else 0
-        spikes_c3      = int(np.sum(self.spikes[self.map_pam]) + np.sum(self.spikes[self.map_ppl1])) if hasattr(self, "map_ppl1") else int(np.sum(self.spikes[self.map_pam]))
-        spikes_c4      = int(np.sum(self.spikes[self.map_attack]) + np.sum(self.spikes[self.map_special]))
-        spikes_c5      = int(np.sum(self.spikes[self.map_gf]) + np.sum(self.spikes[self.map_cx_saccade]))
-        spikes_c6      = int(np.sum(self.spikes[self.map_powershield]) + np.sum(self.spikes[self.map_cqc_counter])) if hasattr(self, "map_powershield") else int(np.sum(self.spikes[self.map_cqc_counter]))
-        spikes_c7      = int(np.sum(self.spikes[self.map_combo]) + np.sum(self.spikes[self.map_combo_fastfaller]))
-        total_spikes   = int(np.sum(self.spikes))
+        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS) CON ACCESO RÁPIDO
+        stats_obj = self._compute_cluster_stats(current_frame, character="FOX")
+        spikes_c0_c1 = stats_obj["cluster_activity"]["C0_C1_Visual"]
+        spikes_c2 = stats_obj["cluster_activity"]["C2_Mechanosensory"]
+        spikes_c3 = stats_obj["cluster_activity"]["C3_Central_Complex"]
+        spikes_c4 = stats_obj["cluster_activity"]["C4_VNC_Motor"]
+        spikes_c5 = stats_obj["cluster_activity"]["C5_Giant_Fiber_SDI"]
+        spikes_c6 = stats_obj["cluster_activity"]["C6_Precision_20XX"]
+        spikes_c7 = stats_obj["cluster_activity"]["C7_Cerebellar_Combos"]
+        total_spikes = stats_obj["total_spikes"]
 
-        jump_spikes    = int(np.sum(self.spikes[self.map_jump]))
-        attack_spikes  = int(np.sum(self.spikes[self.map_attack]))
-        special_spikes = int(np.sum(self.spikes[self.map_special]))
-        shield_spikes  = int(np.sum(self.spikes[self.map_shield]))
-        combo_spikes   = int(np.sum(self.spikes[self.map_combo]))
-        gf_spikes      = int(np.sum(self.spikes[self.map_gf]))
-        left_spikes    = int(np.sum(self.spikes[self.map_left]))
-        right_spikes   = int(np.sum(self.spikes[self.map_right]))
+        jump_spikes    = stats_obj["jump_p"]
+        attack_spikes  = stats_obj["attack_p"]
+        special_spikes = stats_obj["special_p"]
+        shield_spikes  = stats_obj["shield_p"]
+        combo_spikes   = stats_obj["combo_p"]
+        gf_spikes      = stats_obj["gf_p"]
+        left_spikes    = stats_obj["left_p"]
+        right_spikes   = stats_obj["right_p"]
         
         stage_edge = get_stage_edge(stage)
         
         stats = {
             "total_spikes": total_spikes,
-            "neural_activation": f"{(total_spikes / max(1, self.num_neurons)) * 100:.2f}%",
-            "cluster_activity": {
-                "C0_C1_Visual": spikes_c0_c1,
-                "C2_Mechanosensory": spikes_c2,
-                "C3_Central_Complex": spikes_c3,
-                "C4_VNC_Motor": spikes_c4,
-                "C5_Giant_Fiber_SDI": spikes_c5,
-                "C6_Precision_20XX": spikes_c6,
-                "C7_Cerebellar_Combos": spikes_c7
-            },
+            "neural_activation": stats_obj["neural_activation"],
+            "cluster_activity": stats_obj["cluster_activity"],
             "jump_p": jump_spikes,
             "attack_p": attack_spikes,
             "special_p": special_spikes,
@@ -1323,32 +1690,94 @@ class FlyBrain:
         # ENTRENAMIENTO DE MEMORIA EN TIEMPO REAL (Frame-by-frame STDP y hábitos del oponente)
         self.realtime_memory_train(player, opponent, current_frame=current_frame)
 
+        # Reset de descenso de respawn al pisar tierra firme de forma segura
+        if getattr(player, "on_ground", False) and py >= -2.0:
+            self.halo_descent_active = False
+
         # =========================================================================
-        # 0. ESTADOS DE RESPAWN (HALO PLATFORM)
+        # 0. ESTADO DE MUERTE DEL PERSONAJE: Liberar y neutralizar controles
+        # =========================================================================
+        is_player_dead = (act_val in range(0, 11)) or ("DEAD_" in act_str and "FALL" not in act_str and "LEAP" not in act_str)
+        if is_player_dead:
+            self.halo_descent_active = True
+            self.combo_state = None
+            self.combo_count = 0
+            self.edgeguard_state = None
+            self.running_jc_state = None
+            self.drill_waveshine_state = None
+            self.techchase_fox_state = None
+            self.fox_dash_state = None
+            return {
+                "name": "💀 REGENERANDO EN HALO (MUERTE)",
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                "stats": stats
+            }
+
+        # =========================================================================
+        # 0.1. ESTADOS DE RESPAWN (HALO PLATFORM)
         # =========================================================================
         is_on_halo = (act_val in [12, 13]) or ("HALO" in act_str)
         if is_on_halo:
+            self.halo_descent_active = True
+            self.combo_state = None
+            self.combo_count = 0
+            self.edgeguard_state = None
             return {
                 "name": "⚡ BAJANDO DE PLATAFORMA DE RESPAWN",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }
 
         # SWAGGER 20XX: Si el rival está muerto o en halo de respawn, alternar taunt y dash-dance
-        opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str)
-        if opp_on_halo and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 14.0):
-            if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+        # Real muerte en Melee: Acciones 0..10 (DEAD_*). Excluir explícitamente DEAD_FALL (35 / FALL_SPECIAL)
+        opp_is_dead = (opp_act_val in range(0, 11)) or ("DEAD_" in opp_act_str and "FALL" not in opp_act_str and "LEAP" not in opp_act_str)
+        opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str) or opp_is_dead
+        # Solo invulnerabilidad de respawn (halo o > 40 frames); no congelar por rolls o spotdodges normales (<= 30 frames)
+        opp_is_respawn_invuln = opp_on_halo or (getattr(opponent, "invulnerability_left", 0) > 40)
+        if opp_on_halo:
+            if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 20.0):
+                if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                    return self._enforce_safety({
+                        "name": "🦊 SWAGGER 20XX: FOX TAUNT (COME ON! HUMILLACIÓN MENTAL)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
                 return self._enforce_safety({
-                    "name": "🦊 SWAGGER 20XX: FOX TAUNT (COME ON! HUMILLACIÓN MENTAL)",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
-                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "name": "🦊 SWAGGER 20XX: DASH-DANCE DE DOMINANCIA EN CENTRO",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                    "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
-            dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
-            return self._enforce_safety({
-                "name": "🦊 SWAGGER 20XX: DASH-DANCE DE DOMINANCIA EN CENTRO",
-                "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
-                "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-            }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        if opp_is_respawn_invuln:
+            if dist <= 14.0 and getattr(player, "on_ground", True):
+                away_dir = 1.0 - towards_opp
+                runway = (stage_edge - px) if away_dir > 0.5 else (stage_edge + px)
+                if runway >= 20.0:
+                    return self._enforce_safety({
+                        "name": "🛡️ RESPAWN EVASION: FOX DASH-DANCE AWAY",
+                        "jump": False, "attack": False, "special": False, "shield": (current_frame % 3 == 0), "grab": False,
+                        "stick_x": float(away_dir), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🛡️ RESPAWN EVASION: FOX ESCUDO DEFENSIVO",
+                        "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 RESPAWN EVASION: FOX ESPERA TÁCTICA",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
 
         # HUMILLACIÓN 20XX: Disrespect a rival cayendo al abismo sin retorno
         opp_pct = float(getattr(opponent, "percent", 0.0))
@@ -1372,7 +1801,7 @@ class FlyBrain:
         ))
 
         hitstun_left = getattr(player, "hitstun_frames_left", 0)
-        is_in_hitstun = hitstun_left > 0 or ("DAMAGE" in act_str and "AIR" in act_str) or (act_val in range(75, 92))
+        is_in_hitstun = (act_val in range(75, 92)) or ("DAMAGE" in act_str)
         is_tumbling = (act_val == 38) or ("TUMBL" in act_str)
 
         if is_in_hitstun:
@@ -1438,7 +1867,15 @@ class FlyBrain:
                     "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
-            # Si Fox está offstage y sin saltos, caer directamente a la recuperación infalible (Fire Fox / Illusion)
+            else:
+                # Fox offstage sin saltos en TUMBLE: En Melee, los movimientos especiales (botón B) están bloqueados durante DAMAGE_FALL.
+                # Wiggle-out: alternar el stick cancela TUMBLE a FALL en 1 frame, desbloqueando inmediatamente Fire Fox o Illusion.
+                wiggle_x = float(dir_to_stage) if (current_frame % 2 == 0) else (1.0 - float(dir_to_stage))
+                return self._enforce_safety({
+                    "name": "⚡ WIGGLE-OUT ESCAPE DE TUMBLE OFFSTAGE (DESBLOQUEO DE PODERES FOX)",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(wiggle_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
 
         # Fox caído en el suelo: levantarse con invulnerabilidad hacia el centro
         if "DOWN_BOUND" in act_str or "LYING" in act_str or "DOWN_WAIT" in act_str or (act_val in range(183, 195)):
@@ -1690,7 +2127,7 @@ class FlyBrain:
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
-            # F) Salto doble si está disponible:
+            # F) Salto doble si está disponible (prioridad absoluta para ascender seguro):
             if getattr(player, "jumps_left", 0) > 0:
                 self.double_jump_start_frame = current_frame
                 # Si Fox está debajo del escenario, debe saltar curvando HACIA AFUERA para librar el techo inferior:
@@ -2033,9 +2470,19 @@ class FlyBrain:
         # 6. COMBATE AÉREO SOBRE EL ESCENARIO & PLATAFORMAS (Requisito 2, 4)
         # =========================================================================
         if not getattr(player, "on_ground", True):
-            # PLATFORM WAVELAND TECH-CHASE: Si Fox está a la altura de una plataforma aérea
-            # y se desplaza hacia ella para perseguir al rival
-            if (19.0 <= py <= 31.0 or 46.0 <= py <= 58.0) and getattr(player, "speed_y_self", 0) <= 0.3 and (opp_plat is not None or "DOWN" in opp_act_str):
+            # Si Fox está descendiendo de la plataforma de respawn, descender 100% seguro al centro
+            if getattr(self, "halo_descent_active", False):
+                center_drift = 0.40 if px > 10.0 else (0.60 if px < -10.0 else 0.50)
+                return self._enforce_safety({
+                    "name": "🛡️ DESCENSO SEGURO DE RESPAWN AL CENTRO DEL ESCENARIO",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": center_drift, "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "_allow_air_shield": False, "_allow_offstage_chase": False, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+            # PLATFORM WAVELAND TECH-CHASE: Solo si Fox está situado sobre una plataforma aérea
+            fox_plat = BattlefieldMap.is_on_platform(px, py)
+            if fox_plat is not None and getattr(player, "speed_y_self", 0) <= 0.3 and not getattr(self, "halo_descent_active", False):
                 return self._enforce_safety({
                     "name": "⚡ PLATFORM WAVELAND: TECH-CHASE EN PLATAFORMA",
                     "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
@@ -2065,7 +2512,7 @@ class FlyBrain:
                     self.drill_smash_state = "DRILL_ACTIVE"
                 return self._enforce_safety({
                     "name": "🌪️ DRILL AÉREO EN PICADA (DAIR)",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                     "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
@@ -2109,7 +2556,7 @@ class FlyBrain:
                 return self._enforce_safety({
                     "name": "🥊 JAB-RESET FRAME-2 (FORZAR LEVANTAMIENTO)",
                     "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
             # Rango medio de derribo (dist <= 15.0):
@@ -2354,8 +2801,30 @@ class FlyBrain:
             return self._enforce_safety({
                 "name": "🥊 CQC: JAB RÁPIDO FRAME-2 (A)",
                 "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
+
+        # =========================================================================
+        # 10.5. DESCENSO Y DROP-THROUGH DE PLATAFORMA DE FOX
+        # =========================================================================
+        fox_plat = BattlefieldMap.is_on_platform(px, py, stage)
+        fox_on_plat = (fox_plat is not None) or (getattr(player, "on_ground", True) and py >= 18.0)
+        if fox_on_plat and (oy < py - 3.5):
+            if abs(dx) <= 10.0:
+                return self._enforce_safety({
+                    "name": "🌪️ FOX PLATFORM DROP: DESCENSO CON DRILL MULTIHIT (DAIR)",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0,
+                    "_allow_drop_through": True, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                plat_drop_x = float(dir_to_stage) if abs(px) > 48.0 else 0.5
+                return self._enforce_safety({
+                    "name": "⚡ FOX PLATFORM DROP: DESCENSO LIMPIO AL SUELO",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": plat_drop_x, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "_allow_drop_through": True, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
         # 11. NEUTRAL TÁCTICO: DASH-DANCE Y ENTRADAS SEGURAS (11.0 < dist <= 24.0 u)
@@ -2479,49 +2948,27 @@ class FlyBrain:
         """
         stage_edge = BattlefieldMap.get_edge(stage)
         
-        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS)
-        spikes_c0_c1   = int(np.sum(self.spikes[self.map_vis_left_retina]) + np.sum(self.spikes[self.map_vis_right_retina])) if hasattr(self, "map_vis_left_retina") else 0
-        spikes_c2      = int(np.sum(self.spikes[self.map_mech_hitlag]) + np.sum(self.spikes[self.map_mech_shield_stun])) if hasattr(self, "map_mech_hitlag") else 0
-        spikes_c3      = int(np.sum(self.spikes[self.map_pam]) + np.sum(self.spikes[self.map_ppl1])) if hasattr(self, "map_ppl1") else int(np.sum(self.spikes[self.map_pam]))
-        spikes_c4      = int(np.sum(self.spikes[self.map_attack]) + np.sum(self.spikes[self.map_special]))
-        spikes_c5      = int(np.sum(self.spikes[self.map_gf]) + np.sum(self.spikes[self.map_cx_saccade]))
-        spikes_c6      = int(np.sum(self.spikes[self.map_powershield]) + np.sum(self.spikes[self.map_cqc_counter])) if hasattr(self, "map_powershield") else int(np.sum(self.spikes[self.map_cqc_counter]))
-        spikes_c7      = int(np.sum(self.spikes[self.map_combo]) + np.sum(self.spikes[self.map_combo_fastfaller]))
-        total_spikes   = int(np.sum(self.spikes))
-
-        stats = {
-            "dopamine": float(self.dopamine),
-            "octopamine": float(self.octopamine),
-            "total_spikes": total_spikes,
-            "neural_activation": f"{(total_spikes / max(1, self.num_neurons)) * 100:.2f}%",
-            "cluster_activity": {
-                "C0_C1_Visual": spikes_c0_c1,
-                "C2_Mechanosensory": spikes_c2,
-                "C3_Central_Complex": spikes_c3,
-                "C4_VNC_Motor": spikes_c4,
-                "C5_Giant_Fiber_SDI": spikes_c5,
-                "C6_Precision_20XX": spikes_c6,
-                "C7_Cerebellar_Combos": spikes_c7
-            },
-            "jump_p": int(np.sum(self.spikes[self.map_jump])),
-            "attack_p": int(np.sum(self.spikes[self.map_attack])),
-            "special_p": int(np.sum(self.spikes[self.map_special])),
-            "shield_p": int(np.sum(self.spikes[self.map_shield])),
-            "combo_p": int(np.sum(self.spikes[self.map_combo])),
-            "gf_p": int(np.sum(self.spikes[self.map_gf])),
-            "character": "LUIGI"
-        }
+        # DECODIFICACIÓN INTEGRAL DE LOS 8 CLUSTERS ANATÓMICOS (395,144 NEURONAS) CON ACCESO RÁPIDO
+        stats = self._compute_cluster_stats(current_frame, character="LUIGI")
+        spikes_c0_c1 = stats["cluster_activity"]["C0_C1_Visual"]
+        spikes_c2 = stats["cluster_activity"]["C2_Mechanosensory"]
+        spikes_c3 = stats["cluster_activity"]["C3_Central_Complex"]
+        spikes_c4 = stats["cluster_activity"]["C4_VNC_Motor"]
+        spikes_c5 = stats["cluster_activity"]["C5_Giant_Fiber_SDI"]
+        spikes_c6 = stats["cluster_activity"]["C6_Precision_20XX"]
+        spikes_c7 = stats["cluster_activity"]["C7_Cerebellar_Combos"]
+        total_spikes = stats["total_spikes"]
 
         # MODO AUTÓNOMO / TEST (player is None): Decodificación directa de spikes adaptada a Luigi
         if player is None or opponent is None:
-            jump_spikes    = int(np.sum(self.spikes[self.map_jump]))
-            attack_spikes  = int(np.sum(self.spikes[self.map_attack]))
-            special_spikes = int(np.sum(self.spikes[self.map_special]))
-            shield_spikes  = int(np.sum(self.spikes[self.map_shield]))
-            combo_spikes   = int(np.sum(self.spikes[self.map_combo]))
-            gf_spikes      = int(np.sum(self.spikes[self.map_gf]))
-            left_spikes    = int(np.sum(self.spikes[self.map_left]))
-            right_spikes   = int(np.sum(self.spikes[self.map_right]))
+            jump_spikes    = stats["jump_p"]
+            attack_spikes  = stats["attack_p"]
+            special_spikes = stats["special_p"]
+            shield_spikes  = stats["shield_p"]
+            combo_spikes   = stats["combo_p"]
+            gf_spikes      = stats["gf_p"]
+            left_spikes    = stats["left_p"]
+            right_spikes   = stats["right_p"]
 
             net_x = float(np.tanh((right_spikes - left_spikes) / 25.0))
             jump_score = jump_spikes + gf_spikes * 1.5
@@ -2594,11 +3041,14 @@ class FlyBrain:
         luigi_on_plat = (luigi_plat is not None) or (getattr(player, "on_ground", True) and py >= 18.0)
         opp_on_plat = (opp_plat is not None) or (getattr(opponent, "on_ground", True) and oy >= 18.0)
         
-        self.prev_dist_fox = dist
         opp_is_falling = BattlefieldMap.is_opponent_falling(ox, oy, getattr(opponent, "on_ground", True), opp_offstage, stage_edge=stage_edge)
+        is_opp_on_ledge = ("EDGE_" in opp_act_str) or (opp_act_val in [252, 253])
+        corner_threshold = max(38.0, stage_edge - 22.0)
+        is_opp_cornered = (abs(ox) >= corner_threshold) or opp_offstage or is_opp_on_ledge
+        has_stage_control = is_opp_cornered and ((ox > 0 and px <= ox) or (ox < 0 and px >= ox))
 
-        # Si pasaron más de 6 frames desde que se inició un salto, expirar la acción aérea en cola
-        if current_frame - getattr(self, "luigi_jump_frame", current_frame) > 6:
+        # Si pasaron más de 8 frames desde que se inició un salto, expirar la acción aérea en cola
+        if current_frame - getattr(self, "luigi_jump_frame", current_frame) > 8:
             self.luigi_jump_action = None
         # Si pasaron más de 25 frames desde que se inició la carga de misil, resetear carga
         if current_frame - getattr(self, "missile_charge_frame", current_frame) > 25:
@@ -2608,42 +3058,117 @@ class FlyBrain:
         self.realtime_memory_train(player, opponent, current_frame=current_frame)
         habits = self.long_term_memory.get("opponent_habits", {})
 
+        # Reset de descenso de respawn al pisar tierra firme de forma segura
+        if getattr(player, "on_ground", False) and py >= -2.0:
+            self.halo_descent_active = False
+
         # =========================================================================
-        # 0. ESTADOS DE RESPAWN (HALO PLATFORM) & SWAGGER LUIGI 20XX
+        # 0. ESTADO DE MUERTE DEL PERSONAJE: Liberar y neutralizar controles
+        # =========================================================================
+        is_player_dead = (act_val in range(0, 11)) or ("DEAD_" in act_str and "FALL" not in act_str and "LEAP" not in act_str)
+        if is_player_dead:
+            self.halo_descent_active = True
+            self.luigi_jump_action = None
+            self.luigi_wd_dir = 0.5
+            self.missile_charging = False
+            self.missile_charge_timer = 0
+            self.whiff_punish_state = None
+            self.powershield_state = None
+            self.combo_state = None
+            self.combo_count = 0
+            self.edgeguard_state = None
+            self.running_jc_state = None
+            return {
+                "name": "💀 REGENERANDO EN HALO (MUERTE)",
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                "stats": stats
+            }
+
+        # =========================================================================
+        # 0.1. ESTADOS DE RESPAWN (HALO PLATFORM) & SWAGGER LUIGI 20XX
         # =========================================================================
         is_on_halo = (act_val in [12, 13]) or ("HALO" in act_str)
         if is_on_halo:
+            self.halo_descent_active = True
+            self.luigi_jump_action = None
+            self.luigi_wd_dir = 0.5
+            self.missile_charging = False
+            self.missile_charge_timer = 0
+            self.whiff_punish_state = None
+            self.powershield_state = None
+            self.combo_state = None
+            self.combo_count = 0
+            self.edgeguard_state = None
             return {
                 "name": "⚡ BAJANDO DE PLATAFORMA DE RESPAWN",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }
 
-        opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str)
-        if opp_on_halo and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 14.0):
-            # SWAGGER LUIGI 20XX: Alternar Disrespect Taunt y Wavedash Dance
-            if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
-                return self._enforce_safety({
-                    "name": "👟 DISRESPECT EN RESPAWN: LUIGI TAUNT (HUMILLACIÓN MENTAL)",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
-                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
-            dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
-            return self._enforce_safety({
-                "name": "🟢 SWAGGER LUIGI 20XX: WAVEDASH DE DOMINANCIA EN CENTRO",
-                "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False, "taunt": False,
-                "stick_x": float(dance_x), "stick_y": 0.25 if (current_frame % 4 == 0) else 0.5,
-                "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-            }, player, opponent, stage_edge=stage_edge)
+        # SWAGGER LUIGI 20XX: Si el rival está muerto o en halo de respawn, alternar taunt y wavedash dance
+        # Real muerte en Melee: Acciones 0..10 (DEAD_*). Excluir explícitamente DEAD_FALL (35 / FALL_SPECIAL)
+        opp_is_dead = (opp_act_val in range(0, 11)) or ("DEAD_" in opp_act_str and "FALL" not in opp_act_str and "LEAP" not in opp_act_str)
+        opp_on_halo = (opp_act_val in [12, 13]) or ("HALO" in opp_act_str) or opp_is_dead
+        # Solo invulnerabilidad de respawn (halo o > 40 frames); no congelar por rolls o spotdodges normales (<= 30 frames)
+        opp_is_respawn_invuln = opp_on_halo or (getattr(opponent, "invulnerability_left", 0) > 40)
 
-        # HUMILLACIÓN 20XX: Disrespect a rival cayendo al abismo sin retorno
+        if opp_on_halo:
+            # Si el rival está muerto o en el halo de respawn: NUNCA atacar a la nada
+            if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 24.0):
+                if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                    return self._enforce_safety({
+                        "name": "👟 DISRESPECT EN RESPAWN: LUIGI TAUNT (HUMILLACIÓN MENTAL)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
+                return self._enforce_safety({
+                    "name": "🟢 SWAGGER LUIGI 20XX: WAVEDASH DE DOMINANCIA EN CENTRO",
+                    "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False, "taunt": False,
+                    "stick_x": float(dance_x), "stick_y": 0.25 if (current_frame % 4 == 0) else 0.5,
+                    "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        if opp_is_respawn_invuln:
+            # Si el rival desciende con invulnerabilidad de respawn: respetarla, no golpear al vacío
+            if dist <= 14.0 and getattr(player, "on_ground", True):
+                away_dir = 1.0 - towards_opp
+                runway = (stage_edge - px) if away_dir > 0.5 else (stage_edge + px)
+                if runway >= 30.0 and current_frame % 2 == 0:
+                    return self._enforce_safety({
+                        "name": "🛡️ RESPAWN EVASION: WAVEDASH BACK ANTE RIVAL INVENCIBLE",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(away_dir), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🛡️ RESPAWN EVASION: ESCUDO DEFENSIVO ANTE RIVAL INVENCIBLE",
+                        "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 RESPAWN EVASION: ESPERAR FIN DE INVULNERABILIDAD RIVAL",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        # HUMILLACIÓN 20XX: Disrespect a rival cayendo al abismo sin retorno o tras Shoryuken lanzado al techo
         opp_pct = float(getattr(opponent, "percent", 0.0))
-        if opp_offstage and oy < -10.0 and opp_pct >= 55.0 and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
+        is_dying_abyss = opp_offstage and oy < -10.0 and opp_pct >= 55.0
+        is_shoryu_ceiling = (getattr(self, "last_luigi_power", "") == "UPB_SHORYUKEN") and (oy > 25.0) and (opp_pct >= 55.0)
+        if (is_dying_abyss or is_shoryu_ceiling) and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
             teabag_y = 0.0 if (current_frame % 4 < 2) else 0.5
-            teabag_taunt = (current_frame % 20 == 0) and self.dopamine > 0.60
             return self._enforce_safety({
                 "name": "👟 HUMILLACIÓN 20XX: RAPID TEABAG DISRESPECT (SPAM ABAJO)",
-                "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": teabag_taunt,
+                "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
                 "stick_x": 0.5, "stick_y": teabag_y, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
@@ -2659,7 +3184,7 @@ class FlyBrain:
         # 1. HITSTUN, DAÑO, TUMBLE & FRAME-3 N-AIR BREAK-OUT
         # =========================================================================
         hitstun_left = getattr(player, "hitstun_frames_left", 0)
-        is_in_hitstun = hitstun_left > 0 or ("DAMAGE" in act_str and "AIR" in act_str) or (act_val in range(75, 92))
+        is_in_hitstun = (act_val in range(75, 92)) or ("DAMAGE" in act_str)
         is_tumbling = (act_val == 38) or ("TUMBL" in act_str)
 
         if is_in_hitstun:
@@ -2795,7 +3320,7 @@ class FlyBrain:
                         "stick_x": float(dir_to_stage), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }
 
-            # Si Luigi está DEBAJO de la plataforma: CURVAR HACIA AFUERA
+            # Si Luigi está DEBAJO de la plataforma: CURVAR HACIA AFUERA CON RISING CYCLONE O SALTO DOBLE
             if is_under_stage:
                 outward_dir = 1.0 if px >= 0.0 else 0.0
                 if getattr(player, "jumps_left", 0) > 0:
@@ -2805,9 +3330,9 @@ class FlyBrain:
                         "stick_x": float(outward_dir), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }
                 return {
-                    "name": "🌪️ ESCAPE DEBAJO DEL ESCENARIO: CYCLONE / MISSILE EXTERIOR",
+                    "name": "🌪️ ESCAPE DEBAJO DEL ESCENARIO: RISING CYCLONE EXTERIOR (SIN FREEFALL)",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(outward_dir), "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(outward_dir), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
             # A) Special Fall (FALL_SPECIAL - Acciones 35, 36, 37):
@@ -2832,7 +3357,7 @@ class FlyBrain:
             # B.2) Luigi Cyclone activo en el aire (364, 365 o CYCLONE)
             if (act_val in [364, 365]) or any(k in act_str for k in ["SPECIAL_LW", "CYCLONE"]):
                 mash_b = (current_frame % 2 == 0)
-                drift_x = 0.65 if dir_to_stage > 0.5 else 0.35
+                drift_x = float(dir_to_stage)
                 return {
                     "name": "🌪️ RISING LUIGI CYCLONE: MASHING B ACTIVO",
                     "jump": False, "attack": False, "special": bool(mash_b), "shield": False, "grab": False,
@@ -2847,10 +3372,10 @@ class FlyBrain:
                     "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
-            # B.4) Salto doble aéreo en progreso (Acciones 27, 28 o JUMP_AERIAL)
+            # B.4) Salto doble aéreo en progreso (Acciones 27, 28 o JUMP_AERIAL / ARIAL)
             # ¡CRUCIAL! NUNCA interrumpir prematuramente el ascenso del doble salto con Up-B.
             # Se debe permitir que Luigi aproveche toda la enorme flotabilidad vertical de su salto.
-            if (act_val in [27, 28]) or ("JUMP_AERIAL" in act_str):
+            if (act_val in [27, 28]) or ("JUMP_AERIAL" in act_str) or ("ARIAL" in act_str):
                 return {
                     "name": "🪰 ASCENSO DE SALTO DOBLE FLOTANTE AL ESCENARIO",
                     "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
@@ -2869,7 +3394,7 @@ class FlyBrain:
             # D) DOBLE SALTO YA GASTADO (jumps_left == 0):
             # D.1) Snap de Airdodge direccional a la repisa:
             # ÚNICAMENTE permitido si está inmediatamente adyacente a la repisa para evitar Freefall suicida:
-            if (stage_edge - 2.0 <= abs(px) <= stage_edge + 6.0) and (-3.0 <= py <= 3.0):
+            if (stage_edge - 2.0 <= abs(px) <= stage_edge + 2.0) and (-3.0 <= py <= 3.0):
                 return {
                     "name": "⚡ AIRDODGE DIRECCIONAL: SNAP INSTANTÁNEO A LA REPISA",
                     "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
@@ -2878,23 +3403,42 @@ class FlyBrain:
                 }
 
             # D.2) Rango de sweetspot de repisa: SUPER JUMP PUNCH (UP-B)
-            if (-28.0 <= py <= 4.0) and abs(px) <= (stage_edge + 16.0):
+            # Cubre desde -45.0 hasta 4.0u verticalmente y rango horizontal estrecho (|px| <= stage_edge + 3.0)
+            steer_x = 0.5 + 0.35 * (1.0 if dir_to_stage > 0.5 else -1.0)
+            if (-45.0 <= py <= 4.0) and abs(px) <= (stage_edge + 3.0):
                 return {
                     "name": "🟢 SUPER JUMP PUNCH: SWEETSPOT A LA REPISA (UP-B)",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(dir_to_stage), "stick_y": 0.90, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(steer_x), "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
-            # D.3) Distancia horizontal lejana: RISING CYCLONE (DOWN-B) CON MASHING Y AIR DRIFT
-            # En Melee, el Cyclone no induce FALL_SPECIAL (freefall) y puede mashearse para ganar altura y retorno seguro
-            if abs(px) > (stage_edge + 14.0) and py > -22.0:
+            # D.3) Distancia horizontal lejana (|px| > stage_edge + 3.0) y bajo la repisa (py <= 4.0):
+            # Si está a buena altura (py >= -6.0) y muy lejos (|px| > stage_edge + 12.0): GREEN MISSILE HORIZONTAL!
+            # Cubre 40u hacia el escenario (o 150u en Misfire con 12.5% de probabilidad de KO instantáneo)
+            if (-6.0 <= py <= 4.0) and abs(px) > (stage_edge + 12.0):
+                return {
+                    "name": "🚀 RECUPERACIÓN HORIZONTAL: GREEN MISSILE AL ESCENARIO (CHANCE MISFIRE 12.5%)",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }
+
+            # RISING CYCLONE (DOWN-B) CON MASHING Y AIR DRIFT (CERO FREEFALL)
+            if (-45.0 < py <= 4.0) and abs(px) > (stage_edge + 3.0):
                 return {
                     "name": "🌪️ RISING LUIGI CYCLONE: MASHING DOWN-B DE RETORNO",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False, "taunt": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
 
-            # D.4) Fallback seguro: Air Drift hacia el escenario (NUNCA airdodge suicida)
+            # D.4) EMERGENCIA PROFUNDA (py <= -45.0): SUPER JUMP PUNCH DESESPERADO
+            if py <= -45.0:
+                return {
+                    "name": "🟢 SUPER JUMP PUNCH: RESCATE DE EMERGENCIA EN EL ABISMO (UP-B)",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": float(steer_x), "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }
+
+            # D.5) Offstage alto sobre la repisa (py > 4.0): Air Drift hacia el escenario
             return {
                 "name": "🪰 AIR DRIFT HACIA EL ESCENARIO (RECOVERY DRIFT)",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
@@ -2977,9 +3521,7 @@ class FlyBrain:
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-                # 2. RETIRADA EXPLOSIVA: GREEN MISSILE TORPEDO OOS DEFENSIVO
-                # Si Luigi está acorralado cerca de la repisa y en escudo bajo presión, lanza un torpedo de escape hacia el centro
-                is_cornered_in_shield = (abs(px) > (stage_edge - 18.0)) and (px * (ox - px) < 0)
+                is_cornered_in_shield = (abs(px) > (stage_edge - 18.0)) and (px * ox > 0) and (abs(px) > abs(ox))
                 if is_cornered_in_shield and dist <= 16.0:
                     self.shield_frames = 0
                     self._start_missile_charge(current_frame, target_dir=dir_to_stage, max_charge=8, is_defensive=True)
@@ -3134,6 +3676,21 @@ class FlyBrain:
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
+                # WAVEDASH APROXIMACIÓN PARA SHORYUKEN CONFIRM CUANDO EL RIVAL HACE DI LEJOS (6.5 < dist <= 16.0)
+                can_wd_shoryuken = (6.5 < dist <= 16.0) and (45.0 <= opp_pct <= 135.0) and \
+                                   ((self.dopamine > 0.70) or (combo_mastery >= 1.8 and self.dopamine >= 0.50)) and \
+                                   abs(px) < (stage_edge - 12.0)
+                if can_wd_shoryuken:
+                    self.combo_state = None
+                    self.luigi_jump_action = "WAVEDASH"
+                    self.luigi_wd_dir = towards_opp
+                    self.luigi_jump_frame = current_frame
+                    return self._enforce_safety({
+                        "name": "⚡ COMBO HUMILLACIÓN 20XX: D-THROW ➔ WAVEDASH SLIDE ➔ SWEETSPOT SHORYUKEN SETUP",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
                 # TIER 2: DOPAMINA MEDIA (0.50 - 0.75) -> D-THROW TO SHORT-HOP FAIR / UAIR
                 elif self.dopamine >= 0.50:
                     if opp_pct < 45.0:
@@ -3189,6 +3746,17 @@ class FlyBrain:
         # 5.5. COMBATE AÉREO OFENSIVO DE LUIGI (Luigi en el aire sobre el escenario)
         # =========================================================================
         if not getattr(player, "on_ground", True) and not is_offstage:
+            # Si Luigi está descendiendo de la plataforma de respawn, descender 100% seguro al centro
+            if getattr(self, "halo_descent_active", False):
+                self.luigi_jump_action = None
+                center_drift = 0.40 if px > 10.0 else (0.60 if px < -10.0 else 0.50)
+                return self._enforce_safety({
+                    "name": "🛡️ DESCENSO SEGURO DE RESPAWN AL CENTRO DEL ESCENARIO",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": center_drift, "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "_allow_air_shield": False, "_allow_offstage_chase": False, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
             # Si Luigi está aterrizando (LANDING): limpiar cualquier acción de despegue previa
             if "LAND" in act_str or act_val in [42, 43]:
                 self.luigi_jump_action = None
@@ -3207,12 +3775,15 @@ class FlyBrain:
             if jump_act:
                 self.luigi_jump_action = None
                 if jump_act in ["WAVEDASH", "WAVEDASH_BACK"]:
-                    wd_dir = getattr(self, "luigi_wd_dir", towards_opp)
-                    return self._enforce_safety({
-                        "name": "⚡ WAVEDASH DESLIZANTE: AIRDODGE DIAGONAL (0.005 TRACTION)",
-                        "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
-                        "stick_x": float(wd_dir), "stick_y": 0.25, "_allow_air_shield": True, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
+                    # Solo ejecutar airdodge de wavedash si está muy cerca del suelo (py <= 6.5) o sobre una plataforma
+                    # Si está alto en el aire, el airdodge causa FALL_SPECIAL suicida
+                    if py <= 6.5 or BattlefieldMap.is_on_platform(px, py) is not None:
+                        wd_dir = getattr(self, "luigi_wd_dir", towards_opp)
+                        return self._enforce_safety({
+                            "name": "⚡ WAVEDASH DESLIZANTE: AIRDODGE DIAGONAL (0.005 TRACTION)",
+                            "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                            "stick_x": float(wd_dir), "stick_y": 0.25, "_allow_air_shield": True, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
                 elif jump_act == "AERIAL_NAIR":
                     return self._enforce_safety({
                         "name": "🟢 N-AIR OFENSIVO FRAME-3: IMPACTO EN EL AIRE",
@@ -3263,8 +3834,9 @@ class FlyBrain:
                         "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # PLATFORM WAVELAND: Si está a la altura de una plataforma, aterrizar deslizándose
-            if (19.0 <= py <= 31.0 or 46.0 <= py <= 58.0) and getattr(player, "speed_y_self", 0) <= 0.3 and opp_plat is not None:
+            # PLATFORM WAVELAND: Solo si Luigi está físicamente situado sobre una plataforma aérea
+            luigi_plat_now = BattlefieldMap.is_on_platform(px, py)
+            if luigi_plat_now is not None and getattr(player, "speed_y_self", 0) <= 0.3 and not getattr(self, "halo_descent_active", False):
                 return self._enforce_safety({
                     "name": "⚡ PLATFORM WAVELAND: DESLIZAMIENTO EN PLATAFORMA",
                     "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
@@ -3276,7 +3848,8 @@ class FlyBrain:
             offstage_aggro = self.get_plasticity("offstage_aggression", 1.50)
             has_double_jump = getattr(player, "jumps_left", 0) > 0
             is_near_ledge = abs(px) > (stage_edge - 22.0)
-            if (opp_offstage or opp_is_falling or abs(ox) > (stage_edge - 6.0)) and has_double_jump and is_near_ledge and py >= -6.0 and (self.dopamine > 0.65 or offstage_aggro >= 1.40):
+            not_respawning = not getattr(self, "halo_descent_active", False) and getattr(player, "invulnerability_left", 0) <= 30
+            if not_respawning and (opp_offstage or opp_is_falling or abs(ox) > (stage_edge - 6.0)) and has_double_jump and is_near_ledge and py >= -6.0 and (self.dopamine > 0.65 or offstage_aggro >= 1.40):
                 max_chase = 24.0 * min(1.5, max(1.0, offstage_aggro / 1.45))
                 if dist <= max_chase:
                     return self._enforce_safety({
@@ -3286,8 +3859,8 @@ class FlyBrain:
                         "_allow_offstage_chase": True, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # 2. RIVAL EN EL AIRE DIRECTAMENTE ARRIBA (dy > 1.2, |dx| <= 12.0)
-            if dy > 1.2 and abs(dx) <= 12.0:
+            # 2. RIVAL EN EL AIRE DIRECTAMENTE ARRIBA (dy > 1.2, |dx| <= 7.0)
+            if dy > 1.2 and abs(dx) <= 7.0 and dy <= 10.0:
                 return self._enforce_safety({
                     "name": "🦅 UP-AIR VERTICAL JUGGLE (VOLTERETA EN EL AIRE)",
                     "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
@@ -3296,10 +3869,10 @@ class FlyBrain:
 
             # 3. CAYENDO O ATACANDO DESDE ARRIBA DEL RIVAL (dy < -0.5 / py > oy)
             if dy < -0.5:
-                # A) Directamente o muy cerca por encima (|dx| <= 12.0)
-                if abs(dx) <= 12.0:
+                # A) Directamente en rango de impacto vertical (|dx| <= 10.0)
+                if abs(dx) <= 10.0:
                     # Alternancia táctica letal: D-Air Drill multihit y N-Air Frame-3 ambos con FAST-FALL (stick_y: 0.0)
-                    if (current_frame % 2 == 0) or (self.dopamine > 0.60 and dist <= 9.0):
+                    if (current_frame % 2 == 0) or (self.dopamine > 0.60 and dist <= 7.5):
                         return self._enforce_safety({
                             "name": "🌪️ D-AIR DRILL MULTIHIT: PICADA EN HELICÓPTERO",
                             "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
@@ -3312,8 +3885,8 @@ class FlyBrain:
                             "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                         }, player, opponent, stage_edge=stage_edge)
 
-                # B) En picada diagonal hacia el rival (12.0 < |dx| <= 22.0)
-                elif abs(dx) <= 22.0:
+                # B) En picada diagonal hacia el rival (10.0 < |dx| <= 18.0) con Fast-Fall
+                elif abs(dx) <= 18.0:
                     is_facing_opp = (dx > 0 and getattr(player, "facing", True)) or (dx < 0 and not getattr(player, "facing", True))
                     if not is_facing_opp and current_frame % 3 != 0:
                         bair_dir = 0.0 if getattr(player, "facing", True) else 1.0
@@ -3330,21 +3903,21 @@ class FlyBrain:
                         }, player, opponent, stage_edge=stage_edge)
                     else:
                         return self._enforce_safety({
-                            "name": "🌪️ D-AIR DRILL MULTIHIT: PICADA EN HELICÓPTERO",
+                            "name": "🟢 N-AIR DESCENDENTE: PATADA DE PICADA DIAGONAL",
                             "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                            "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                            "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                         }, player, opponent, stage_edge=stage_edge)
 
-                # C) A mayor distancia horizontal (|dx| > 22.0) pero por encima: picada agresiva de avance
+                # C) Fuera de rango horizontal (|dx| > 18.0): Drift y aproximación aérea limpia sin whiff
                 else:
                     return self._enforce_safety({
-                        "name": "🦅 ASALTO AÉREO EN PICADA: F-AIR / N-AIR AVANZANDO DESDE ARRIBA",
-                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.15, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
+                        "name": "🦅 DRIFT AÉREO DESCENDENTE: APROXIMACIÓN SIN WHIFF",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # 4. COMBATE AÉREO A LA MISMA ALTURA O CERCANO (dist <= 16.0 u)
-            if dist <= 16.0:
+            # 4. COMBATE AÉREO A LA MISMA ALTURA O CERCANO (dist <= 8.5 u)
+            if dist <= 8.5:
                 is_facing_opp = (dx > 0 and getattr(player, "facing", True)) or (dx < 0 and not getattr(player, "facing", True))
                 if not is_facing_opp and current_frame % 3 != 0:
                     bair_dir = 0.0 if getattr(player, "facing", True) else 1.0
@@ -3367,7 +3940,7 @@ class FlyBrain:
                         "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # 5. APROXIMACIÓN AÉREA HACIA EL RIVAL (dist > 16.0 u)
+            # 5. APROXIMACIÓN AÉREA HACIA EL RIVAL (dist > 8.5 u)
             return self._enforce_safety({
                 "name": "🦅 DRIFT AÉREO DE APROXIMACIÓN HACIA EL RIVAL",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
@@ -3380,23 +3953,44 @@ class FlyBrain:
         if luigi_on_plat and (oy < py - 3.5):
             self.missile_charge_timer = 0
             is_squatting = (act_val in [39, 40, 41]) or ("SQUAT" in act_str and "KNEE" not in act_str)
-            
-            # Si el rival está desplazado horizontalmente (|dx| > 6.0 u) o Luigi está agachado:
-            # Deslizarse hacia el borde de la plataforma en dirección al rival (stick_x: towards_opp, stick_y: 0.5).
-            # En pocos frames cruza el borde y cae al aire hacia el rival atacando en picada.
-            if abs(dx) > 6.0 or is_squatting:
+            is_top_platform = (py >= 45.0)
+
+            # Caso 1: Top Platform (Battlefield Y=54.4)
+            # Salida deslizante para descender hacia el rival si está lejos o Luigi agachado:
+            if is_top_platform and (abs(dx) > 14.0 or is_squatting):
                 return self._enforce_safety({
                     "name": "⚡ DROP-THROUGH PLATAFORMA: SALIDA DESLIZANTE HACIA EL RIVAL",
                     "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
                     "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
+
+            # Caso 2: Plataformas Laterales (o rival en rango directo abajo):
+            # A) Si el rival está en rango de impacto vertical directo (|dx| <= 10.0 u):
+            # Descenso con ataque aéreo D-Air Drill multihit o descenso limpio:
+            if abs(dx) <= 10.0:
+                if current_frame % 2 == 0 or self.dopamine > 0.60:
+                    return self._enforce_safety({
+                        "name": "⚡ DROP-THROUGH PLATAFORMA: DESCENSO CON D-AIR DRILL AL RIVAL ABAJO",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0,
+                        "_allow_drop_through": True, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "⚡ DROP-THROUGH PLATAFORMA: DESCENSO LIMPIO AL SUELO",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "_allow_drop_through": True, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
             else:
-                # Rival directamente debajo (|dx| <= 6.0 u):
-                # DROP-THROUGH LIMPIO: stick_y = 0.0 PURO sin botones (en Melee presionar attack/special ejecuta Down-Tilt/Down-Smash bloqueándolo).
+                # B) Rival más alejado abajo (|dx| > 10.0 u):
+                # Descenso limpio al suelo principal sin resbalar fuera del escenario:
+                plat_drop_x = float(dir_to_stage) if abs(px) > 48.0 else 0.5
                 return self._enforce_safety({
                     "name": "⚡ DROP-THROUGH PLATAFORMA: DESCENSO LIMPIO AL SUELO",
                     "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": plat_drop_x, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "_allow_drop_through": True, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
@@ -3462,7 +4056,7 @@ class FlyBrain:
 
             # 2. Si está dentro del rango del smash (5.0 < dist <= 16.0 u): NUNCA REGALARSE
             elif dist <= 16.0:
-                is_cornered_charge = (abs(px) > (stage_edge - 16.0)) and (px * (ox - px) < 0)
+                is_cornered_charge = (abs(px) > (stage_edge - 16.0)) and (px * ox > 0) and (abs(px) > abs(ox))
                 if is_cornered_charge:
                     self._start_missile_charge(current_frame, target_dir=dir_to_stage, max_charge=8, is_defensive=True)
                     return self._enforce_safety({
@@ -3486,7 +4080,8 @@ class FlyBrain:
 
             # 3. Si está fuera de alcance (dist > 16.0 u): INTERRUPCIÓN A DISTANCIA (PODER RECARGABLE O FUEGO)
             else:
-                missile_path_clear = abs(px) < 5.0 and ((towards_opp > 0.5 and (stage_edge - px) > 60.0) or (towards_opp < 0.5 and (stage_edge + px) > 60.0))
+                runway_fwd = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+                missile_path_clear = (runway_fwd >= 55.0)
                 if current_frame % 2 == 1 and missile_path_clear:
                     self._start_missile_charge(current_frame)
                     return self._enforce_safety({
@@ -3505,49 +4100,76 @@ class FlyBrain:
         # 7. CAZA Y ASALTO EN PLATAFORMAS (Requisito 4: ANTI-CAMPER PLATAFORMAS)
         # =========================================================================
         # CASO 7.2: EL RIVAL ESTÁ EN UNA PLATAFORMA O ACAMPANDO EN ALTURA
-        if opp_on_plat or (oy >= 16.0 and abs(ox) <= 60.0):
+        if (opp_on_plat or (oy >= 16.0 and abs(ox) <= 60.0)) and not opp_on_halo and not opp_is_dead:
             # Si Luigi está en el suelo: NUNCA hacer zigzag pasivo abajo
             if getattr(player, "on_ground", True) and not luigi_on_plat:
                 if abs(dx) > 14.0:
                     return self._enforce_safety({
-                        "name": "⚡ INVASIÓN DE PLATAFORMA: WAVEDASH DE APROXIMACIÓN",
-                        "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.25,
-                        "_allow_air_shield": True, "stats": stats
+                        "name": "⚡ INVASIÓN DE PLATAFORMA: SPRINT DE APROXIMACIÓN",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-                if (current_frame // 10) % 2 == 0:
-                    self.luigi_jump_action = "PLATFORM_INVASION"
+                # Sharking solo si está directamente debajo (|dx| <= 7.0), si no invadir con salto y waveland
+                if abs(dx) > 7.0 or (current_frame // 10) % 2 == 0:
+                    self._set_luigi_jump("PLATFORM_INVASION", current_frame)
                     return self._enforce_safety({
                         "name": "🦘 INVASIÓN DE PLATAFORMA: SALTO Y WAVELAND AL RIVAL",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
                         "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 else:
-                    self.luigi_jump_action = "AERIAL_UAIR"
+                    self._set_luigi_jump("AERIAL_UAIR", current_frame)
                     return self._enforce_safety({
                         "name": "🦈 PLATFORM SHARKING: UP-AIR A TRAVÉS DE LA PLATAFORMA",
                         "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 1.0, "stats": stats
+                        "stick_x": float(towards_opp), "stick_y": 0.68, "c_stick_x": 0.5, "c_stick_y": 1.0, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
             else:
+                # Luigi y el rival están en la plataforma
                 if dist <= 6.5:
+                    is_opp_shielding = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
+                    if is_opp_shielding:
+                        return self._enforce_safety({
+                            "name": "🤼 ASALTO EN PLATAFORMA: GRAB AL ESCUDO (Z)",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": True,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
                     return self._enforce_safety({
                         "name": "💥 ASALTO EN PLATAFORMA: DOWN-SMASH SEMI-SPIKE",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
+                elif dist <= 14.0:
+                    # Rango medio en plataforma: Down-Tilt launcher o Short-Hop Nair (Cero Grab-Whiffs)
+                    if current_frame % 2 == 0:
+                        return self._enforce_safety({
+                            "name": "💥 ASALTO EN PLATAFORMA: DOWN-TILT LAUNCHER",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        self._set_luigi_jump("AERIAL_NAIR", current_frame)
+                        return self._enforce_safety({
+                            "name": "🦘 ASALTO EN PLATAFORMA: SHORT-HOP NAIR FRAME-3",
+                            "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
                 else:
+                    self.luigi_jump_action = "WAVEDASH"
+                    self.luigi_wd_dir = towards_opp
+                    self.luigi_jump_frame = current_frame
                     return self._enforce_safety({
-                        "name": "🤼 ASALTO EN PLATAFORMA: AGARRE (Z)",
-                        "jump": False, "attack": False, "special": False, "shield": False, "grab": True,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "name": "⚡ ASALTO EN PLATAFORMA: WAVEDASH RUSHDOWN",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
         # 7.5. INTERCEPCIÓN Y CAZA AÉREA: RIVAL EN EL AIRE (ANTI-AIR & AERIAL HUNT)
         # =========================================================================
-        opp_is_airborne = (not getattr(opponent, "on_ground", True)) or (oy >= 5.0)
+        opp_is_airborne = (not getattr(opponent, "on_ground", True)) and not opp_on_plat and not opp_on_halo and not opp_is_dead
         if opp_is_airborne and getattr(player, "on_ground", True) and not opp_offstage and not opp_is_falling:
             # 1. RIVAL EN EL AIRE DIRECTAMENTE SOBRE O CAYENDO HACIA LUIGI (|dx| <= 8.5, dy >= 3.0)
             if abs(dx) <= 8.5 and dy >= 3.0:
@@ -3577,23 +4199,23 @@ class FlyBrain:
             if dist <= 25.0:
                 # Opción A: Salto ofensivo con N-Air Frame-3 (la patada más rápida de Melee)
                 if (current_frame // 5) % 3 == 0:
-                    self.luigi_jump_action = "AERIAL_NAIR"
+                    self._set_luigi_jump("AERIAL_NAIR", current_frame)
                     return self._enforce_safety({
                         "name": "🦘 CAZA AÉREA: SALTO OFENSIVO NAIR FRAME-3",
                         "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(towards_opp), "stick_y": 0.68, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 # Opción B: Salto ofensivo con Forward-Air Chop
                 elif (current_frame // 5) % 3 == 1:
-                    self.luigi_jump_action = "AERIAL_FAIR"
+                    self._set_luigi_jump("AERIAL_FAIR", current_frame)
                     return self._enforce_safety({
                         "name": "🦘 CAZA AÉREA: SHORT-HOP FAIR CHOP AL AIRE",
                         "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(towards_opp), "stick_y": 0.68, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 # Opción C: Salto ofensivo con Luigi Cyclone en ascenso
                 else:
-                    self.luigi_jump_action = "AERIAL_CYCLONE"
+                    self._set_luigi_jump("AERIAL_CYCLONE", current_frame)
                     return self._enforce_safety({
                         "name": "🌪️ CAZA AÉREA: SALTO + CYCLONE VORTEX AL RIVAL",
                         "jump": True, "attack": False, "special": True, "shield": False, "grab": False,
@@ -3622,7 +4244,7 @@ class FlyBrain:
                 return self._enforce_safety({
                     "name": "⚡ JAB-RESET SETUP: WAVEDASH A QUEMARROPA ➔ UP-B PING",
                     "jump": True, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
         is_opp_knockdown = (opp_act_val in range(183, 203)) or any(k in opp_act_str for k in [
@@ -3651,7 +4273,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "🥊 JAB-RESET FRAME-2 (FORZAR LEVANTAMIENTO)",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 return self._enforce_safety({
                     "name": "💥 TECH-CHASE: DOWN-SMASH SEMI-SPIKE",
@@ -3667,7 +4289,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "⚡ TECH-CHASE: WAVEDASH HACIA EL RIVAL ➔ DOWN-SMASH",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 return self._enforce_safety({
                     "name": "💥 TECH-CHASE: DOWN-SMASH SEMI-SPIKE",
@@ -3683,7 +4305,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "💥 TECH-CHASE 20XX: WAVEDASH ADELANTE ➔ DOWN-SMASH TRAP",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 return self._enforce_safety({
                     "name": "🏃 TECH-CHASE: SPRINT AL RIVAL EN EL SUELO",
@@ -3698,10 +4320,24 @@ class FlyBrain:
         if opp_is_falling or opp_offstage or is_opp_on_ledge:
             offstage_aggro = self.get_plasticity("offstage_aggression", 1.50)
             if is_opp_on_ledge:
+                if abs(px) < (stage_edge - 16.0):
+                    if current_frame % 4 < 2:
+                        return self._enforce_safety({
+                            "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO HACIA LA REPISA",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "🏃 CERROJO DE ESQUINA: POSICIONAMIENTO EN BORDE",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+
                 # 0. DISRESPECT SUPREMO: LUIGI DOWN-TAUNT METEOR SPIKE (Frame 45 Ledge Spike)
                 # Si Luigi está al borde del abismo y la dopamina es alta (>0.60), desciende el tacón de la humillación
                 is_right_at_edge = abs(px) >= (stage_edge - 6.5) and getattr(player, "on_ground", True)
-                if is_right_at_edge and (self.dopamine >= 0.70 or (current_frame % 4 == 0 and self.dopamine >= 0.50)):
+                if is_right_at_edge and (self.dopamine >= 0.70 or opp_pct >= 45.0):
                     self.learn_from_success("EDGEGUARD")
                     return self._enforce_safety({
                         "name": "👟 DISRESPECT SUPREMO: LUIGI DOWN-TAUNT METEOR SPIKE (HUMILLACIÓN 20XX)",
@@ -3726,35 +4362,22 @@ class FlyBrain:
                     "name": "💥 PRESIÓN EN BORDE: DOWN-SMASH SEMI-SPIKE DE REPISA",
                     "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                     "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+            # EDGEGUARD SEGURO EN TIERRA: NUNCA saltar al abismo desde el suelo.
+            # Mantener posición en el borde y ejecutar Down-Smash semi-spike (Frame 5) o Bola de Fuego.
+            if dist <= 18.0:
+                return self._enforce_safety({
+                    "name": "💥 EDGEGUARD: DOWN-SMASH SEMI-SPIKE",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
-
-            has_double_jump = getattr(player, "jumps_left", 0) > 0
-            is_near_ledge = abs(px) > (stage_edge - 22.0)
-            # CAZA OFFSTAGE AGRESIVA (DEEP METEOR SPIKE):
-            # Se activa si tiene doble salto, cerca del borde y con dopamina > 0.65 O alta agresividad aprendida
-            if has_double_jump and is_near_ledge and py >= -6.0 and (self.dopamine > 0.65 or offstage_aggro >= 1.40):
-                max_chase = 24.0 * min(1.5, max(1.0, offstage_aggro / 1.45))
-                if dist <= max_chase:
-                    return self._enforce_safety({
-                        "name": "🌪️ OFFSTAGE HUNT: D-AIR METEOR SPIKE (DEPOT)",
-                        "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.0,
-                        "_allow_offstage_chase": True, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
-
-            if abs(px) > (stage_edge - 14.0):
-                if dist <= 16.0:
-                    return self._enforce_safety({
-                        "name": "💥 EDGEGUARD: DOWN-SMASH SEMI-SPIKE",
-                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
-                else:
-                    return self._enforce_safety({
-                        "name": "🔥 EDGEGUARD: BOLA DE FUEGO VERDE AL ABISMO",
-                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🔥 EDGEGUARD: BOLA DE FUEGO VERDE AL ABISMO",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
         # 10. POWERSHIELD REFLECT & ZERO SHIELD-STUN COUNTER (FRAME-1 REFLEJO DE PROYECTIL)
@@ -3779,7 +4402,7 @@ class FlyBrain:
                 return self._enforce_safety({
                     "name": "⚡ POWERSHIELD REFLECT: WAVEDASH ADELANTE TRAS REFLEJO",
                     "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
         if is_projectile and getattr(player, "on_ground", True):
@@ -3792,22 +4415,192 @@ class FlyBrain:
             }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
+        # 10.5. PRESIÓN EN LA ESQUINA & CONTROL DE ESCENARIO (CORNER PRESSURE & LEDGE TRAP)
+        # =========================================================================
+        # Si el rival acampa o se refugia en una esquina/borde del escenario:
+        # LUIGI TIENE EL CONTROL DEL ESCENARIO. NUNCA retirarse ni hacer Wavedash-back
+        # hacia el abismo opuesto. Mantener el cerrojo con zonificación de bolas de fuego,
+        # agarres al escudo, y castigo demoledor con Down-Smash (Frame 5) si intenta escapar.
+        if is_opp_cornered and has_stage_control and getattr(player, "on_ground", True) and not is_in_hitstun and not is_captured and not is_being_thrown and not is_tumbling:
+            trap_offset = 12.0 # Distancia ideal de espaciado en esquina
+            target_px = (ox - trap_offset) if ox > 0 else (ox + trap_offset)
+            target_px = max(-(stage_edge - 12.0), min(stage_edge - 12.0, target_px))
+            dist_to_opp = dist
+            is_opp_shielding_corner = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
+            is_opp_attacking_corner = ("ATTACK" in opp_act_str or "SWORD" in opp_act_str or "SPECIAL" in opp_act_str or opp_act_val in range(44, 75))
+
+            # 0. SI EL RIVAL ESTÁ COLGADO O SUBIENDO DE LA REPISA:
+            if is_opp_on_ledge or opp_offstage:
+                if abs(px) < (stage_edge - 16.0):
+                    if current_frame % 4 < 2:
+                        return self._enforce_safety({
+                            "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO HACIA LA REPISA",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "🏃 CERROJO DE ESQUINA: POSICIONAMIENTO EN BORDE",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                else:
+                    if current_frame % 3 == 0:
+                        return self._enforce_safety({
+                            "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO AL ABISMO",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "💥 PRESIÓN EN BORDE: DOWN-SMASH SEMI-SPIKE DE REPISA",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+
+            # 1. RIVAL EN ESCUDO EN LA ESQUINA:
+            if is_opp_shielding_corner:
+                if dist_to_opp <= 8.5:
+                    return self._enforce_safety({
+                        "name": "🤼 PRESIÓN EN ESQUINA: GRAB AL ESCUDO (Z)",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": True,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🔥 PRESIÓN EN ESQUINA: BOLA DE FUEGO CONTRA ESCUDO",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+            # 2. RIVAL EN EL AIRE EN LA ESQUINA (SALTOS CORTOS O DROP-IN):
+            if not getattr(opponent, "on_ground", True):
+                if dist_to_opp <= 8.5:
+                    return self._enforce_safety({
+                        "name": "💥 PRESIÓN EN ESQUINA: CROUCH-CANCEL DOWN-SMASH ANTI-AIR",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🔥 PRESIÓN EN ESQUINA: BOLA DE FUEGO ANTI-AÉREA",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+            # 3. RIVAL ATACANDO O LANZANDO GOLPES DESDE LA ESQUINA:
+            if is_opp_attacking_corner:
+                if dist_to_opp <= 7.5:
+                    if (opp_pct >= 45.0 or self.dopamine > 0.60) and abs(px) <= (stage_edge - 18.0):
+                        self.last_luigi_power = "UPB_SHORYUKEN"
+                        return self._enforce_safety({
+                            "name": "💥 PRESIÓN EN ESQUINA: CROUCH-CANCEL SWEETSPOT UP-B SHORYUKEN (PING!)",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    return self._enforce_safety({
+                        "name": "💥 PRESIÓN EN ESQUINA: CROUCH-CANCEL DOWN-SMASH SEMI-SPIKE",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🔥 PRESIÓN EN ESQUINA: CASTIGO DE WHIFF CON BOLA DE FUEGO",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+            # 4. DISTANCIA CUERPO A CUERPO EN ESQUINA (dist <= 8.0 u):
+            if dist_to_opp <= 8.0:
+                if (current_frame % 2 == 0):
+                    return self._enforce_safety({
+                        "name": "💥 PRESIÓN EN ESQUINA: DOWN-SMASH SEMI-SPIKE FRAME-5",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🥊 PRESIÓN EN ESQUINA: JAB FRAME-2 (POP-UP)",
+                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+            # 5. RANGO DE ESPACIADO TÁCTICO EN ESQUINA (8.0 < dist <= 24.0 u):
+            if dist_to_opp <= 24.0:
+                if dist_to_opp <= 12.0:
+                    # En rango de aproximación media (8-12u): Avanzar activamente con F-Tilt o bola de fuego
+                    if current_frame % 4 == 0:
+                        return self._enforce_safety({
+                            "name": "💥 PRESIÓN EN ESQUINA: F-TILT DE APROXIMACIÓN",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    elif current_frame % 4 == 2:
+                        return self._enforce_safety({
+                            "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO VERDE CONTINUA",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "🏃 CERROJO DE ESQUINA: APROXIMACIÓN TERRESTRE SEGURA",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                else:
+                    # Rango 12-24u: Zonificación continua con bola de fuego y avance
+                    if current_frame % 4 < 2:
+                        return self._enforce_safety({
+                            "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO VERDE CONTINUA",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "🏃 CERROJO DE ESQUINA: APROXIMACIÓN TERRESTRE SEGURA",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+
+            # 6. DISTANCIA LARGA (dist > 24.0 u): Luigi se acerca controladamente al cerrojo
+            if (current_frame % 20 < 10):
+                return self._enforce_safety({
+                    "name": "🔥 CERROJO DE ESQUINA: BOLA DE FUEGO DE APROXIMACIÓN",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 CERROJO DE ESQUINA: CIERRE DE DISTANCIA AL CENTRO",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+        # =========================================================================
         # 11. COMBATE CUERPO A CUERPO CQC (dist <= 11.0 unidades)
         # =========================================================================
         is_opp_attacking = ("ATTACK" in opp_act_str or "SWORD" in opp_act_str or "SPECIAL" in opp_act_str or opp_act_val in range(44, 75))
         is_opp_shielding = ("SHIELD" in opp_act_str or opp_act_val in [178, 179, 180, 181])
 
         # MODULACIÓN BIOLÓGICA DIRECTA: CLUSTERS 5 Y 7 EN COMBATE TÁCTICO LUIGI
-        if spikes_c5 > 15 and is_opp_attacking and dist <= 14.0 and not is_opp_shielding and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 14.0):
-            # Cluster 5 Giant Fiber (DNp01): Evasión saccádica inmediata Wavedash-back
-            self.luigi_jump_action = "WAVEDASH_BACK"
-            self.luigi_wd_dir = 1.0 - towards_opp
-            self.luigi_jump_frame = current_frame
-            return self._enforce_safety({
-                "name": "⚡ LUIGI GIANT FIBER SACCADE (Cluster 5): ESCAPE WAVEDASH-BACK 20XX",
-                "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-            }, player, opponent, stage_edge=stage_edge)
+        runway_back = (stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)
+        if spikes_c5 > 15 and is_opp_attacking and dist <= 14.0 and not is_opp_shielding and getattr(player, "on_ground", True) and not is_opp_cornered and not has_stage_control:
+            if runway_back >= 45.0:
+                # Cluster 5 Giant Fiber (DNp01): Evasión saccádica inmediata Wavedash-back
+                self.luigi_jump_action = "WAVEDASH_BACK"
+                self.luigi_wd_dir = 1.0 - towards_opp
+                self.luigi_jump_frame = current_frame
+                return self._enforce_safety({
+                    "name": "⚡ LUIGI GIANT FIBER SACCADE (Cluster 5): ESCAPE WAVEDASH-BACK 20XX",
+                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(1.0 - towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🛡️ LUIGI GIANT FIBER SACCADE (Cluster 5): BLOQUEO DEFENSIVO",
+                    "jump": False, "attack": False, "special": False, "shield": True, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
 
         if spikes_c7 > 15 and (opp_is_falling or "DAMAGE" in opp_act_str or opp_act_val in range(183, 205)) and getattr(player, "on_ground", True) and dist <= 14.0:
             # Cluster 7 Red Cerebelar de Combos: Wavedash Down-Tilt launcher
@@ -3827,7 +4620,7 @@ class FlyBrain:
                 }, player, opponent, stage_edge=stage_edge)
 
             # 2. DEFENSIVA: RETIRADA EXPLOSIVA CON GREEN MISSILE SI ESTÁ ACORRALADO EN EL BORDE
-            is_cornered_cqc = abs(px) > (stage_edge - 16.0) and (px * (ox - px) < 0)
+            is_cornered_cqc = (abs(px) > (stage_edge - 16.0)) and (px * ox > 0) and (abs(px) > abs(ox)) and (is_opp_attacking or is_opp_charging)
             if is_cornered_cqc and dist <= 11.0:
                 self._start_missile_charge(current_frame, target_dir=dir_to_stage, max_charge=8, is_defensive=True)
                 return self._enforce_safety({
@@ -3859,8 +4652,10 @@ class FlyBrain:
 
             if is_opp_attacking:
                 cqc_reflex = self.get_plasticity("cqc_counter_reflex", 1.50)
-                cc_shoryu_limit = min(115.0, 75.0 * (cqc_reflex / 1.50))
-                cc_dsmash_limit = min(110.0, 60.0 * (cqc_reflex / 1.50))
+                pain_tol = self.get_plasticity("pain_tolerance", 1.50)
+                endo_mult = 1.0 + (getattr(self, "endorphin", 0.50) - 0.50) * 0.40
+                cc_shoryu_limit = min(120.0, 75.0 * (cqc_reflex / 1.50) * (pain_tol / 1.50) * endo_mult)
+                cc_dsmash_limit = min(115.0, 60.0 * (cqc_reflex / 1.50) * (pain_tol / 1.50) * endo_mult)
                 if dist <= 5.5 and getattr(player, "percent", 0.0) < cc_shoryu_limit:
                     self.learn_from_success("CQC_COUNTER")
                     self.last_luigi_power = "UPB_SHORYUKEN"
@@ -3876,7 +4671,7 @@ class FlyBrain:
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                elif dist > 5.5 and abs(px) < (stage_edge - 14.0):
+                elif dist > 5.5 and (((stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)) >= 45.0) and not is_opp_cornered and not has_stage_control:
                     self.whiff_punish_state = "PUNISH_READY"
                     self.whiff_punish_frame = current_frame
                     self.luigi_jump_action = "WAVEDASH_BACK"
@@ -3886,7 +4681,7 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "⚡ VIST WAVEDASH-BACK BAIT: MICROCANCEL FUERA DE ALCANCE",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 else:
                     return self._enforce_safety({
@@ -3920,7 +4715,14 @@ class FlyBrain:
                     "stick_x": 0.5, "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            if dist <= 7.0:
+            if dist <= 5.0 and current_frame % 2 == 0:
+                return self._enforce_safety({
+                    "name": "🥊 CQC: JAB RÁPIDO FRAME-2 (A)",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+            if dist <= 7.5:
                 return self._enforce_safety({
                     "name": "💥 CQC: DOWN-SMASH SEMI-SPIKE FRAME-5",
                     "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
@@ -3930,7 +4732,7 @@ class FlyBrain:
             return self._enforce_safety({
                 "name": "🥊 CQC: JAB RÁPIDO FRAME-2 (A)",
                 "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
@@ -3944,12 +4746,19 @@ class FlyBrain:
                 is_ready = (getattr(self, "whiff_punish_state", None) == "PUNISH_READY") and (current_frame - getattr(self, "whiff_punish_frame", -100) <= 12)
                 if is_ready:
                     self.whiff_punish_state = None
-                    return self._enforce_safety({
-                        "name": "💥 VIST WHIFF PUNISH: F-SMASH DIAGONAL DEMOLEDOR",
-                        "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.70, "c_stick_x": float(towards_opp), "c_stick_y": 0.70, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
-                elif abs(px) < (stage_edge - 14.0):
+                    if dist <= 8.5:
+                        return self._enforce_safety({
+                            "name": "💥 VIST WHIFF PUNISH: F-SMASH DIAGONAL DEMOLEDOR",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.70, "c_stick_x": float(towards_opp), "c_stick_y": 0.70, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "💥 VIST WHIFF PUNISH: WAVEDASH DOWN-TILT LAUNCHER",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                elif (((stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)) >= 45.0) and not is_opp_cornered and not has_stage_control:
                     self.whiff_punish_state = "PUNISH_READY"
                     self.whiff_punish_frame = current_frame
                     self.luigi_jump_action = "WAVEDASH_BACK"
@@ -3958,40 +4767,74 @@ class FlyBrain:
                     return self._enforce_safety({
                         "name": "⚡ VIST WAVEDASH-BACK BAIT: MICROCANCEL FUERA DE ALCANCE",
                         "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
             cx_spikes = int(self.spikes[self.map_cx_saccade].sum()) if hasattr(self, "map_cx_saccade") else 0
             entropy = (current_frame * 17 + cx_spikes * 7 + int(self.dopamine * 100)) % 100
+            is_facing_opp = (dx > 0 and getattr(player, "facing", True)) or (dx < 0 and not getattr(player, "facing", True))
 
-            # 1. ATAQUE AÉREO DE ENTRADA: SHORT-HOP OFENSIVO NAIR / FAIR / BAIR WALL (20% probabilidad)
+            # 1. SI EL RIVAL ESTÁ A LA ESPALDA DE LUIGI: SHORT-HOP B-AIR WALL SI HAY PISTA (CERO ATAQUES AL VACÍO)
+            runway_to_opp = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+            if not is_facing_opp and runway_to_opp >= 35.0:
+                self._set_luigi_jump("AERIAL_BAIR", current_frame)
+                return self._enforce_safety({
+                    "name": "🦅 ENTRADA AÉREA: SHORT-HOP B-AIR WALL AL RIVAL",
+                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            elif not is_facing_opp and runway_to_opp < 35.0:
+                # Cerca del borde: NO saltar hacia el abismo. Mantenerse en el suelo con Crouch Down-Smash
+                return self._enforce_safety({
+                    "name": "🟢 CONTROL DE ESPALDA EN BORDE: CROUCH-DOWN-SMASH (CERO SALTOS AL VACÍO)",
+                    "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+
+            # 2. ATAQUE AÉREO DE ENTRADA: SHORT-HOP OFENSIVO NAIR / FAIR / BAIR WALL (20% probabilidad)
             if entropy < 20:
-                is_facing_opp = (dx > 0 and getattr(player, "facing", True)) or (dx < 0 and not getattr(player, "facing", True))
-                if not is_facing_opp or (current_frame % 3 == 0 and abs(px) < (stage_edge - 14.0)):
+                runway_fwd = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+                if runway_fwd < 38.0:
+                    # Cerca del borde: NO saltar hacia adelante al abismo.
+                    # Mantenerse en tierra con zoning de bola de fuego o crouch
+                    return self._enforce_safety({
+                        "name": "🔥 ZONIFICACIÓN EN BORDE: BOLA DE FUEGO VERDE (CERO SALTOS AL VACÍO)",
+                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                        "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                elif current_frame % 3 == 0 and abs(px) < (stage_edge - 14.0):
                     self._set_luigi_jump("AERIAL_BAIR", current_frame)
-                    bair_dir = 0.0 if getattr(player, "facing", True) else 1.0
                     return self._enforce_safety({
                         "name": "🦅 ENTRADA AÉREA: SHORT-HOP B-AIR WALL AL RIVAL",
-                        "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": float(bair_dir), "c_stick_y": 0.5, "stats": stats
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                elif dist > 13.5 and runway_fwd >= 45.0:
+                    self.luigi_jump_action = "WAVEDASH"
+                    self.luigi_wd_dir = towards_opp
+                    self.luigi_jump_frame = current_frame
+                    return self._enforce_safety({
+                        "name": "⚡ ENTRADA NEUTRAL: WAVEDASH RUSHDOWN DE APROXIMACIÓN",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 elif current_frame % 2 == 0:
                     self._set_luigi_jump("AERIAL_NAIR", current_frame)
                     return self._enforce_safety({
                         "name": "🦅 ENTRADA AÉREA: SHORT-HOP NAIR FRAME-3 CROSS-UP",
-                        "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
                         "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
                 else:
                     self._set_luigi_jump("AERIAL_FAIR", current_frame)
                     return self._enforce_safety({
                         "name": "🦅 ENTRADA AÉREA: SHORT-HOP FAIR CHOP AL RIVAL",
-                        "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                        "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": float(towards_opp), "c_stick_y": 0.5, "stats": stats
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
 
-            # 2. ZONIFICACIÓN NEUTRAL CON BOLA DE FUEGO VERDE (NEUTRAL-B SEGURO) (18% probabilidad)
-            if 20 <= entropy < 38 and dist >= 13.0:
+            # 3. ZONIFICACIÓN NEUTRAL CON BOLA DE FUEGO VERDE (NEUTRAL-B SEGURO) (18% probabilidad)
+            if 20 <= entropy < 38 and dist >= 13.0 and is_facing_opp:
                 return self._enforce_safety({
                     "name": "🔥 ZONIFICACIÓN NEUTRAL: BOLA DE FUEGO VERDE REBOTANTE",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
@@ -4001,12 +4844,30 @@ class FlyBrain:
             # 3. FINTA OFENSIVA: WAVEDASH ADELANTE ➔ SWEETSPOT UP-B SHORYUKEN DE FUEGO / CYCLONE (14% probabilidad)
             if 38 <= entropy < 52:
                 if (opp_pct >= 40.0 or self.dopamine > 0.55) and dist <= 16.0:
-                    self.last_luigi_power = "UPB_SHORYUKEN"
-                    return self._enforce_safety({
-                        "name": "💥 ENTRADA OFENSIVA: WAVEDASH ADELANTE ➔ SWEETSPOT UP-B SHORYUKEN DE FUEGO (PING!)",
-                        "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                        "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
+                    if dist <= 5.5:
+                        self.last_luigi_power = "UPB_SHORYUKEN"
+                        return self._enforce_safety({
+                            "name": "💥 ENTRADA OFENSIVA: WAVEDASH ADELANTE ➔ SWEETSPOT UP-B SHORYUKEN DE FUEGO (PING!)",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        runway_fwd = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+                        if runway_fwd >= 45.0:
+                            self.luigi_jump_action = "WAVEDASH"
+                            self.luigi_wd_dir = towards_opp
+                            self.luigi_jump_frame = current_frame
+                            return self._enforce_safety({
+                                "name": "💥 ENTRADA OFENSIVA: WAVEDASH ADELANTE ➔ SWEETSPOT UP-B SHORYUKEN DE FUEGO (PING!)",
+                                "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                                "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                            }, player, opponent, stage_edge=stage_edge)
+                        else:
+                            return self._enforce_safety({
+                                "name": "🔥 ENTRADA OFENSIVA SEGURA: BOLA DE FUEGO AL BORDE",
+                                "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                                "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                            }, player, opponent, stage_edge=stage_edge)
                 else:
                     self.last_luigi_power = "CYCLONE"
                     return self._enforce_safety({
@@ -4038,7 +4899,7 @@ class FlyBrain:
                 }, player, opponent, stage_edge=stage_edge)
 
             # 6. BOLA DE FUEGO VERDE TÁCTICA (10% probabilidad)
-            if 78 <= entropy < 88:
+            if 78 <= entropy < 88 and is_facing_opp:
                 return self._enforce_safety({
                     "name": "🔥 ENTRADA NEUTRAL: BOLA DE FUEGO VERDE TÁCTICA",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
@@ -4047,83 +4908,100 @@ class FlyBrain:
 
             # 7. WAVEDASH BACK BAIT O RUSHDOWN ANTE RIVAL PASIVO (12% probabilidad)
             is_opp_idle = (opp_act_val in [14, 15] or "WAIT" in opp_act_str or "STAND" in opp_act_str)
-            if is_opp_idle and abs(px) < (stage_edge - 14.0):
-                self.luigi_jump_action = "WAVEDASH"
-                self.luigi_wd_dir = towards_opp
-                self.luigi_jump_frame = current_frame
-                return self._enforce_safety({
-                    "name": "⚡ ASALTO A RIVAL PASIVO: WAVEDASH ADELANTE (0.005 TRACTION)",
-                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5,
-                    "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+            runway_forward = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+            runway_back = (stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)
+            if is_opp_idle:
+                if runway_forward >= 45.0:
+                    self.luigi_jump_action = "WAVEDASH"
+                    self.luigi_wd_dir = towards_opp
+                    self.luigi_jump_frame = current_frame
+                    return self._enforce_safety({
+                        "name": "⚡ ASALTO A RIVAL PASIVO: WAVEDASH ADELANTE (0.005 TRACTION)",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🏃 APROXIMACIÓN TERRESTRE SEGURA AL BORDE",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
             else:
-                self.luigi_jump_action = "WAVEDASH_BACK"
-                self.luigi_wd_dir = 1.0 - towards_opp
-                return self._enforce_safety({
-                    "name": "🏃 DASH-DANCE ➔ WAVEDASH BACK BAIT (WHIFF TRAP)",
-                    "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(1.0 - towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5,
-                    "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+                if is_opp_attacking and dist <= 10.0 and runway_back >= 50.0 and not is_opp_cornered and not has_stage_control:
+                    self.luigi_jump_action = "WAVEDASH_BACK"
+                    self.luigi_wd_dir = 1.0 - towards_opp
+                    return self._enforce_safety({
+                        "name": "🏃 DASH-DANCE ➔ WAVEDASH BACK BAIT (WHIFF TRAP)",
+                        "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(1.0 - towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🏃 ESPACIADO TERRESTRE SEGURO (SIN SUICIDIO OFFSTAGE)",
+                        "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False,
+                        "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                        "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
         # 12. DISTANCIA LARGA (dist > 24.0 u): PODERES DE ASALTO & APROXIMACIÓN
         # =========================================================================
         else:
             # 1. Torpedo de aproximación recargable: GREEN MISSILE (Side-B)
-            # REGLA ESTRICTA ANTI-SUICIDIO: Solo desde el centro exacto del escenario (abs(px) < 5.0)
-            # con pista completa (> 60.0 u), para evitar SPECIAL_FALL offstage
-            missile_path_clear = abs(px) < 5.0 and ((towards_opp > 0.5 and (stage_edge - px) > 60.0) or (towards_opp < 0.5 and (stage_edge + px) > 60.0))
+            # Pista segura hacia el rival (runway >= 55.0 u) para evitar SPECIAL_FALL offstage
+            runway_forward = (stage_edge - px) if towards_opp > 0.5 else (stage_edge + px)
+            missile_path_clear = (runway_forward >= 55.0) and (stage_edge - abs(ox) >= 28.0) and not is_opp_cornered
             if (current_frame % 40 == 0 or current_frame == 440) and missile_path_clear:
-                self._start_missile_charge(current_frame, max_charge=18)
+                self._start_missile_charge(current_frame, max_charge=14)
                 return self._enforce_safety({
                     "name": "🚀 PODER ESPECIAL RECARGABLE: GREEN MISSILE TORPEDO DE ASALTO (SIDE-B)",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            # Si el rival está pasivo / acampando sin atacar: acortar distancia de inmediato con Wavedash
+            # Si el rival está pasivo / acampando sin atacar: acortar distancia con Wavedash si hay pista suficiente (>= 45u)
             is_opp_idle = (opp_act_val in [14, 15] or "WAIT" in opp_act_str or "STAND" in opp_act_str)
-            if is_opp_idle and abs(px) < (stage_edge - 14.0):
+            if is_opp_idle and runway_forward >= 45.0:
                 self.luigi_jump_action = "WAVEDASH"
                 self.luigi_wd_dir = towards_opp
                 self.luigi_jump_frame = current_frame
                 return self._enforce_safety({
                     "name": "⚡ ASALTO A RIVAL PASIVO: WAVEDASH RUSHDOWN (0.005 TRACTION)",
                     "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5,
+                    "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            # 2. Aproximación aérea con Short-Hop N-Air
-            if current_frame % 40 < 25:
-                self.luigi_jump_action = "AERIAL_NAIR"
-                return self._enforce_safety({
-                    "name": "🦘 APROXIMACIÓN AÉREA: SHORT-HOP AVANZANDO",
-                    "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
-
-            # 3. Bola de fuego verde ocasional para cubrir el avance
-            if current_frame % 40 < 32 and abs(px) < (stage_edge - 16.0):
+            # 2. Zoning táctico con Bola de Fuego Verde para cubrir aproximación (sin saltos al aire inútiles)
+            if current_frame % 20 < 10 and abs(px) < (stage_edge - 16.0):
                 return self._enforce_safety({
                     "name": "🔥 ZONING PROFESIONAL: BOLA DE FUEGO VERDE",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
                     "stick_x": 0.5, "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            # 4. Wavedash Rushdown deslizante (0.005 de fricción para cruzar el escenario al instante)
-            if current_frame % 3 != 0 and abs(px) < (stage_edge - 14.0) and self.dopamine > 0.40:
+            # 3. Wavedash Rushdown deslizante (0.005 de fricción para cruzar el escenario al instante)
+            if runway_forward >= 45.0:
                 self.luigi_jump_action = "WAVEDASH"
                 self.luigi_wd_dir = towards_opp
                 self.luigi_jump_frame = current_frame
                 return self._enforce_safety({
                     "name": "⚡ WAVEDASH RUSHDOWN: GLIDE SUPREMO (0.005 TRACTION)",
                     "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
-                    "stick_x": float(towards_opp), "stick_y": 0.85, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "stick_x": float(towards_opp), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                }, player, opponent, stage_edge=stage_edge)
+            else:
+                return self._enforce_safety({
+                    "name": "🏃 APROXIMACIÓN TERRESTRE CONTROLADA (BORDE SEGURO)",
+                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                    "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
-            # 5. Sprint agresivo 20XX
+            # 4. Sprint agresivo 20XX
             return self._enforce_safety({
                 "name": "🏃 20XX SPRINT AGRESIVO (CIERRE DE DISTANCIA)",
                 "jump": False, "attack": False, "special": False, "shield": False, "grab": False,

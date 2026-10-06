@@ -12,7 +12,8 @@ try:
 except ImportError:
     venv_python = "/home/ltar/.venvs/pytorch/bin/python"
     if os.path.exists(venv_python) and sys.executable != venv_python:
-        os.execv(venv_python, [venv_python] + sys.argv)
+        script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+        os.execv(venv_python, [venv_python, script] + sys.argv[1:])
 
 import time
 import subprocess

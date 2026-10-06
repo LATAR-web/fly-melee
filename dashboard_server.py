@@ -64,6 +64,8 @@ class SimState:
         self.is_live = False
         self.last_live_time = 0.0
         self.dopamine = 0.5
+        self.endorphin = 0.5
+        self.flow_state = False
         self.octopamine = 0.2
         self.stage_name = "Battlefield"
         self.stage_edge = 68.4
@@ -168,6 +170,8 @@ def simulation_worker():
                     state.last_action = act
                     state.action_name = act.get("name", "EN GUARDIA")
                     state.dopamine = float(state.brain.dopamine)
+                    state.endorphin = float(getattr(state.brain, "endorphin", 0.5))
+                    state.flow_state = bool(act.get("stats", {}).get("flow_state", False))
                     state.octopamine = float(state.brain.octopamine)
                     state.p1["is_shining"] = "UP-B" in state.action_name or "SHORYUKEN" in state.action_name or "SHINE" in state.action_name
                     state.p1["is_laser"] = "FUEGO" in state.action_name or "FIREBALL" in state.action_name or "LÁSER" in state.action_name
@@ -297,6 +301,8 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                             "action_name": state.action_name,
                             "stats": state.last_action.get("stats", {"total_spikes": 0}),
                             "dopamine": state.dopamine,
+                            "endorphin": state.endorphin,
+                            "flow_state": getattr(state, "flow_state", False),
                             "octopamine": state.octopamine,
                             "combo_count": getattr(state.brain, "combo_count", 0),
                             "num_neurons": getattr(state.brain, "num_neurons", 395144),
@@ -306,8 +312,12 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                                 "matches_played": state.brain.long_term_memory.get("matches_played", 0),
                                 "matches_won": state.brain.long_term_memory.get("matches_won", 0),
                                 "total_kos": state.brain.long_term_memory.get("total_kos", 0),
-                                "edge_fear": round(float(state.brain.long_term_memory.get("edge_fear", 1.35)), 2),
-                                "combo_mastery": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("combo_mastery", 1.2)), 2)
+                                "total_deaths": state.brain.long_term_memory.get("total_deaths", 0),
+                                "edge_fear": round(float(state.brain.long_term_memory.get("edge_fear", 1.0)), 2),
+                                "win_addiction": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("win_addiction", 5.0)), 2),
+                                "loss_aversion_fury": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("loss_aversion_fury", 5.0)), 2),
+                                "combo_mastery": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("combo_mastery", 1.2)), 2),
+                                "endorphin_resilience": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("endorphin_resilience", 1.5)), 2)
                             },
                             "p1": state.p1,
                             "p2": state.p2
@@ -368,6 +378,8 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                     "action_name": state.action_name,
                     "stats": state.last_action.get("stats", {"total_spikes": 0}),
                     "dopamine": state.dopamine,
+                    "endorphin": state.endorphin,
+                    "flow_state": getattr(state, "flow_state", False),
                     "octopamine": state.octopamine,
                     "combo_count": getattr(state.brain, "combo_count", 0),
                     "num_neurons": getattr(state.brain, "num_neurons", 395144),
@@ -377,8 +389,12 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                         "matches_played": state.brain.long_term_memory.get("matches_played", 0),
                         "matches_won": state.brain.long_term_memory.get("matches_won", 0),
                         "total_kos": state.brain.long_term_memory.get("total_kos", 0),
-                        "edge_fear": round(float(state.brain.long_term_memory.get("edge_fear", 1.35)), 2),
-                        "combo_mastery": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("combo_mastery", 1.2)), 2)
+                        "total_deaths": state.brain.long_term_memory.get("total_deaths", 0),
+                        "edge_fear": round(float(state.brain.long_term_memory.get("edge_fear", 1.0)), 2),
+                        "win_addiction": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("win_addiction", 5.0)), 2),
+                        "loss_aversion_fury": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("loss_aversion_fury", 5.0)), 2),
+                        "combo_mastery": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("combo_mastery", 1.2)), 2),
+                        "endorphin_resilience": round(float(state.brain.long_term_memory.get("synaptic_plasticity", {}).get("endorphin_resilience", 1.5)), 2)
                     },
                     "p1": state.p1,
                     "p2": state.p2
@@ -410,6 +426,8 @@ class FlyDashboardHandler(SimpleHTTPRequestHandler):
                         state.last_action = payload.get("action", state.last_action)
                         state.action_name = payload.get("action_name", state.action_name)
                         state.dopamine = float(payload.get("dopamine", state.dopamine))
+                        state.endorphin = float(payload.get("endorphin", state.endorphin))
+                        state.flow_state = bool(payload.get("flow_state", state.flow_state))
                         state.octopamine = float(payload.get("octopamine", state.octopamine))
                         state.stage_name = str(payload.get("stage_name", state.stage_name))
                         state.stage_edge = float(payload.get("stage_edge", state.stage_edge))

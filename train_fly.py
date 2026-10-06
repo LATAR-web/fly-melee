@@ -23,7 +23,8 @@ except ImportError:
         "/home/ltar/.venvs/pytorch/bin/python",
     ]:
         if os.path.exists(venv_python) and sys.executable != venv_python:
-            os.execv(venv_python, [venv_python] + sys.argv)
+            script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+            os.execv(venv_python, [venv_python, script] + sys.argv[1:])
     raise
 
 import time
@@ -315,7 +316,7 @@ def simulate_match(brain, fly_char="LUIGI", c_name="FOX", st_name="BATTLEFIELD",
     act_rec = brain.get_controller_decision(player=p_fly_off, opponent=p_opp_neut, current_frame=match_frame_base + 65, stage=st_name)
     if not act_rec.get("shield") or "SNAP INSTANTÁNEO" in act_rec["name"]:
         brain.learn_from_success("SAFE_RECOVERY", value=1.5)
-        brain.long_term_memory["edge_fear"] = max(0.95, brain.long_term_memory.get("edge_fear", 1.15) * 0.995)
+        brain.long_term_memory["edge_fear"] = 1.0
 
     match_kos = max(match_kos, 4)
     match_combos = max(match_combos, 3)
