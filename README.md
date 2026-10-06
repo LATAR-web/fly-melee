@@ -5,6 +5,10 @@
 [![Neurons](https://img.shields.io/badge/LIF%20Neurons-395%2C144-orange.svg)](#-arquitectura-técnica-y-modulación-por-clusters)
 [![Synapses](https://img.shields.io/badge/Active%20Synapses-72.9M%20(CSC)-purple.svg)](#-arquitectura-técnica-y-modulación-por-clusters)
 
+
+
+
+
 Simulación biofísica en tiempo real del cerebro completo de la mosca de la fruta (*Drosophila melanogaster*, **395,144 neuronas Leaky Integrate-and-Fire** y **~73 millones de sinapsis** del proyecto **FlyWire / Princeton**) conectado de manera síncrona a **Super Smash Bros. Melee** a **60Hz nativos**.
 
 El conectoma biológico decodifica la percepción visual del combate, procesa la dinámica de neurotransmisores (**Dopamina PAM** y **Octopamina PPL1**), modula decisiones motoras mediante descargas de espigas en clusters anatómicos y ejecuta biomecánica avanzada a nivel competitivo 20XX con una barrera fail-safe de **cero suicidios**.
