@@ -203,7 +203,14 @@ Cubren:
 
 ---
 
-## 📜 Créditos y Reconocimientos
+## 👥 Desarrolladores y Créditos
+
+### 🛠️ Equipo de Desarrollo
+- **Desarrollador Principal:** [LATAR](https://github.com/LATAR-web)
+- **Desarrollador Secundario:** [Absorbedfish](https://github.com/Absorbedfish)
+
+### 📜 Reconocimientos
 - **FlyWire Consortium & Princeton Neuroscience Institute**: Por la titánica reconstrucción del conectoma de *Drosophila melanogaster*.
 - **Project Slippi & libmelee**: Por el puente de red determinista a 60 FPS sobre emulación Dolphin.
 - **Al Reino Animal**: Por demostrarnos que un insecto de 0.5 miligramos puede jugar Melee mejor que nosotros.
+

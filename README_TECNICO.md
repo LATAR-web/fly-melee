@@ -385,7 +385,15 @@ La suite de validación continua en [`verify_fixes.py`](file:///home/ltar/projec
 
 ---
 
+## 👥 Equipo de Desarrollo y Créditos
+- **Desarrollador Principal:** [LATAR](https://github.com/LATAR-web)
+- **Desarrollador Secundario:** [Absorbedfish](https://github.com/Absorbedfish)
+- **FlyWire Consortium & Princeton Neuroscience Institute**: Reconstrucción conectómica completa de *Drosophila melanogaster*.
+- **Project Slippi & libmelee**: API y entorno de emulación determinista para Super Smash Bros. Melee.
+
+---
+
 ## 📚 Enlaces Relacionados
 - [**DICCIONARIO_TECNICO.md**](file:///home/ltar/projects/fly-melee/DICCIONARIO_TECNICO.md): Glosario y enciclopedia de términos de neurociencia, tensores CSC, hardware y Melee 20XX de la A a la Z.
 - [**README.md**](file:///home/ltar/projects/fly-melee/README.md): Guía de instalación, inicio rápido y configuración del emulador Dolphin y panel web 3D.
-- [**verify_fixes.py**](file:///home/ltar/projects/fly-melee/verify_fixes.py): Suite de 81 pruebas de integración y verificación continua.
+- [**verify_fixes.py**](file:///home/ltar/projects/fly-melee/verify_fixes.py): Suite de pruebas de integración y verificación continua.
