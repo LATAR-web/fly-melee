@@ -745,6 +745,8 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                             "action_name": action.get("name", "EN GUARDIA"),
                             "dopamine": action.get("stats", {}).get("dopamine", getattr(brain, "dopamine", 0.85)),
                             "endorphin": action.get("stats", {}).get("endorphin", getattr(brain, "endorphin", 0.5)),
+                            "serotonin": action.get("stats", {}).get("serotonin", getattr(brain, "serotonin", 0.70)),
+                            "acetylcholine": action.get("stats", {}).get("acetylcholine", getattr(brain, "acetylcholine", 0.85)),
                             "flow_state": action.get("stats", {}).get("flow_state", False),
                             "octopamine": action.get("stats", {}).get("octopamine", getattr(brain, "octopamine", 0.2)),
                             "combo_count": getattr(brain, "combo_count", 0),

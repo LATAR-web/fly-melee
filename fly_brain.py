@@ -301,6 +301,8 @@ class FlyBrain:
             "dopamine": float(self.dopamine),
             "octopamine": float(self.octopamine),
             "endorphin": cur_endo,
+            "serotonin": float(getattr(self, "serotonin", 0.70)),
+            "acetylcholine": float(getattr(self, "acetylcholine", 0.85)),
             "flow_state": is_flow,
             "win_addiction": float(self.get_plasticity("win_addiction", 5.0)),
             "total_spikes": total_spikes,
@@ -880,6 +882,10 @@ class FlyBrain:
         self.chaingrab_count = 0
         self.luigi_ledge_state = None
         self.luigi_ledge_timer = 0
+        self.cyclone_ground_primed = False
+        self.misfire_active = False
+        self.serotonin = 0.70
+        self.acetylcholine = 0.85
 
     def _set_luigi_jump(self, action_name, current_frame):
         """Registra la acción aérea en cola y el frame en que se inició para ejecución inmediata al despegar."""
@@ -3366,6 +3372,15 @@ class FlyBrain:
 
             # B.3) Green Missile en vuelo (347-350 o MISSILE)
             if (act_val in range(347, 351)) or any(k in act_str for k in ["SPECIAL_S", "MISSILE"]):
+                h_speed = max(abs(getattr(player, "speed_ground_x_self", 0.0)), abs(getattr(player, "speed_air_x_self", 0.0)))
+                if h_speed > 2.5 or getattr(self, "misfire_active", False):
+                    self.misfire_active = True
+                    self.dopamine = 1.0
+                    return {
+                        "name": "🚀 ¡MISFIRE ATÓMICO EN VUELO (12.5%)! TORPEDO SUPER-SÓNICO AL ESCENARIO",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
+                        "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }
                 return {
                     "name": "🚀 GREEN MISSILE EN VUELO: DIRECCIÓN AL ESCENARIO",
                     "jump": False, "attack": False, "special": False, "shield": False, "grab": False,
@@ -3424,8 +3439,9 @@ class FlyBrain:
 
             # RISING CYCLONE (DOWN-B) CON MASHING Y AIR DRIFT (CERO FREEFALL)
             if (-45.0 < py <= 4.0) and abs(px) > (stage_edge + 3.0):
+                c_name = "🌪️ RISING LUIGI CYCLONE (PRIMED ELEVATOR): MASHING DOWN-B DE RETORNO" if getattr(self, "cyclone_ground_primed", False) else "🌪️ RISING LUIGI CYCLONE: MASHING DOWN-B DE RETORNO"
                 return {
-                    "name": "🌪️ RISING LUIGI CYCLONE: MASHING DOWN-B DE RETORNO",
+                    "name": c_name,
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False, "taunt": False,
                     "stick_x": float(dir_to_stage), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }
@@ -4267,7 +4283,7 @@ class FlyBrain:
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                if current_frame % 2 == 1 or missed_tech_freq > 3:
+                if current_frame % 2 == 1 or missed_tech_freq >= 2:
                     self.jab_reset_active = True
                     self.jab_reset_frame = current_frame
                     return self._enforce_safety({
@@ -4346,13 +4362,13 @@ class FlyBrain:
                     }, player, opponent, stage_edge=stage_edge)
 
                 # Lectura de hábitos en repisa
-                if habits.get("ledge_attack_freq", 0) > 3 or (current_frame % 2 == 0 and opp_pct < 60.0):
+                if habits.get("ledge_attack_freq", 0) >= 2 or (current_frame % 2 == 0 and opp_pct < 60.0):
                     return self._enforce_safety({
                         "name": "💥 PRESIÓN EN BORDE: DOWN-SMASH SEMI-SPIKE DE REPISA",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                elif habits.get("ledge_roll_freq", 0) > 3:
+                elif habits.get("ledge_roll_freq", 0) >= 2:
                     return self._enforce_safety({
                         "name": "💥 LECTURA DE REPISA (ROLL READ): DOWN-SMASH SEMI-SPIKE DE INTERCEPCIÓN",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
@@ -4664,14 +4680,14 @@ class FlyBrain:
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                elif dist <= 5.5 and getattr(player, "percent", 0.0) < cc_dsmash_limit:
+                elif dist <= 7.2 and getattr(player, "percent", 0.0) < cc_dsmash_limit:
                     self.learn_from_success("CQC_COUNTER")
                     return self._enforce_safety({
                         "name": "🟢 CQC: CROUCH-CANCEL FRAME-5 DOWN-SMASH COUNTER",
                         "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
                         "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
                     }, player, opponent, stage_edge=stage_edge)
-                elif dist > 5.5 and (((stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)) >= 45.0) and not is_opp_cornered and not has_stage_control:
+                elif dist > 7.2 and (((stage_edge - px) if (1.0 - towards_opp) > 0.5 else (stage_edge + px)) >= 45.0) and not is_opp_cornered and not has_stage_control:
                     self.whiff_punish_state = "PUNISH_READY"
                     self.whiff_punish_frame = current_frame
                     self.luigi_jump_action = "WAVEDASH_BACK"
@@ -4693,6 +4709,7 @@ class FlyBrain:
             # 4. PODER ESPECIAL 1: DOWN-B LUIGI CYCLONE (TORNADO DE LUIGI - FRAME-1 INVENCIBLE)
             # En CQC, el Cyclone absorbe golpes rivales y atrapa al oponente en un remolino multihit
             if (current_frame % 4 == 0) and not is_opp_shielding:
+                self.cyclone_ground_primed = True
                 return self._enforce_safety({
                     "name": "🌪️ PODER ESPECIAL: LUIGI CYCLONE TERRESTRE (VÓRTICE MULTIHIT)",
                     "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
@@ -4870,6 +4887,7 @@ class FlyBrain:
                             }, player, opponent, stage_edge=stage_edge)
                 else:
                     self.last_luigi_power = "CYCLONE"
+                    self.cyclone_ground_primed = True
                     return self._enforce_safety({
                         "name": "🌪️ PODER ESPECIAL: WAVEDASH ADELANTE ➔ LUIGI CYCLONE VORTEX",
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
