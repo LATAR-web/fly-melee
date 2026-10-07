@@ -501,14 +501,17 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
             if was_in_game and not is_in_game:
                 print(f"\n🏁 [Fin de Partida #{match_number}] Guardando experiencia en memoria biológica a largo plazo...")
                 p1_stk = getattr(brain, "prev_p1_stock", 0)
-                p2_stk = getattr(brain, "prev_p2_stock", 0)
+                opp_stks = [int(getattr(o, "stock", 0)) for p_num, o in gamestate.players.items() if p_num != 1 and o and getattr(o, "character", None) is not None]
+                if not opp_stks:
+                    opp_stks = [getattr(brain, "prev_p2_stock", 0)]
+                max_opp_stk = max(opp_stks) if opp_stks else 0
                 p1_obj = gamestate.players.get(1)
                 char_p1 = str(p1_obj.character).split(".")[-1].capitalize() if p1_obj and getattr(p1_obj, "character", None) else "Luigi"
-                if p1_stk > p2_stk:
-                    print(f"🏆 ¡VICTORIA DE LA MOSCA! {char_p1} ({p1_stk}⭐) superó a su rival ({p2_stk}⭐).")
+                if p1_stk > max_opp_stk or (p1_stk > 0 and max_opp_stk == 0):
+                    print(f"🏆 ¡VICTORIA DE LA MOSCA! {char_p1} ({p1_stk}⭐) superó a todos sus rivales en la partida campal.")
                     brain.learn_from_success("MATCH_WON")
                 else:
-                    print(f"💀 DERROTA. {char_p1} ({p1_stk}⭐) cayó ante su rival ({p2_stk}⭐). Adaptando sinapsis defensivas.")
+                    print(f"💀 DERROTA. {char_p1} ({p1_stk}⭐) cayó en combate (rival líder: {max_opp_stk}⭐). Adaptando sinapsis defensivas.")
                     brain.learn_from_error("MATCH_LOST")
 
                 brain.long_term_memory["matches_played"] += 1
@@ -572,8 +575,8 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     for p_num in [2, 3, 4]:
                         cand = gamestate.players.get(p_num)
                         if cand and getattr(cand, "stock", None) is not None:
+                            brain.prev_opponent_stocks[p_num] = int(cand.stock)
                             brain.prev_p2_stock = int(cand.stock)
-                            break
                     brain.dopamine = 0.85 # Motivación inicial de combate: Adicción a ganar (85%)
                     brain.endorphin = 0.50
                     brain.octopamine = 0.20
@@ -581,12 +584,30 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                     continue
 
                 fly_player = gamestate.players.get(1)
-                human_player = None
+                
+                # Descubrir todos los rivales presentes en la partida (Puertos 2, 3, 4)
+                all_opponents = []
                 for p_num in [2, 3, 4]:
                     cand = gamestate.players.get(p_num)
                     if cand and getattr(cand, "character", None) is not None:
-                        human_player = cand
-                        break
+                        all_opponents.append(cand)
+
+                # Filtrar rivales vivos (con stock > 0)
+                living_opponents = []
+                for opp in all_opponents:
+                    stk = getattr(opp, "stock", None)
+                    if stk is not None and int(stk) <= 0:
+                        continue
+                    living_opponents.append(opp)
+
+                active_opponents = living_opponents if living_opponents else all_opponents
+
+                current_stage = getattr(gamestate, "stage", None)
+                stage_edge_val = brain.get_stage_edge(current_stage)
+                stage_name_str = str(current_stage).split(".")[-1].replace("_", " ").title() if current_stage else "Battlefield"
+
+                # Selección de objetivo táctico óptimo (Target Selection IQ)
+                human_player = brain.select_best_target(fly_player, active_opponents, stage_edge=stage_edge_val) if active_opponents else None
                 
                 if fly_player and human_player:
                     # Guardia de animación de entrada (Fox bajando del Arwing):
@@ -612,22 +633,32 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                             looming_rate=0.0,
                             player=fly_player,
                             opponent=human_player,
-                            current_frame=step_count
+                            current_frame=step_count,
+                            opponents=active_opponents
                         )
                         step_count += 1
                         continue
-                    # 1. Extraer posición y velocidad de aproximación óptica (Looming)
+                    # 1. Extraer posición y velocidad de aproximación óptica (Looming) agregada
                     dx = human_player.position.x - fly_player.position.x
                     dy = human_player.position.y - fly_player.position.y
                     distance = (dx**2 + dy**2)**0.5
                     
                     last_distance = getattr(brain, "prev_dist", distance)
-                    looming_rate = max(0.0, (last_distance - distance) * 1.5)
+                    target_looming = max(0.0, (last_distance - distance) * 1.5)
                     brain.prev_dist = distance
-                    
-                    current_stage = getattr(gamestate, "stage", None)
-                    stage_edge_val = brain.get_stage_edge(current_stage)
-                    stage_name_str = str(current_stage).split(".")[-1].replace("_", " ").title() if current_stage else "Battlefield"
+
+                    # Calcular máxima tasa de looming entre todos los rivales activos
+                    max_looming_rate = target_looming
+                    for opp in active_opponents:
+                        opp_dx = float(opp.position.x) - float(fly_player.position.x)
+                        opp_dy = float(opp.position.y) - float(fly_player.position.y)
+                        opp_dist = math.hypot(opp_dx, opp_dy)
+                        opp_key = getattr(opp, "port", id(opp))
+                        last_opp_dist = brain.prev_opponent_dists.get(opp_key, opp_dist)
+                        opp_looming = max(0.0, (last_opp_dist - opp_dist) * 1.5)
+                        brain.prev_opponent_dists[opp_key] = opp_dist
+                        if opp_looming > max_looming_rate:
+                            max_looming_rate = opp_looming
                     
                     threat = max(0.0, min(1.0, (75.0 - distance) / 75.0))
                     rel_x = max(-1.0, min(1.0, dx / 45.0))
@@ -644,17 +675,24 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                         rel_x=rel_x,
                         rel_y=rel_y,
                         is_offstage=is_offstage,
-                        looming_rate=looming_rate,
+                        looming_rate=max_looming_rate,
                         player=fly_player,
                         opponent=human_player,
-                        current_frame=step_count
+                        current_frame=step_count,
+                        opponents=active_opponents
                     )
                     
                     # 3. Avanzar simulación biológica LIF a 60Hz nativos en tiempo real (CSC sub-milisecond)
                     brain.step(current)
                     
                     # 4. Decodificar decisión técnica inteligente (Luigi o Fox según personaje en P1)
-                    action = brain.get_controller_decision(player=fly_player, opponent=human_player, current_frame=step_count, stage=current_stage)
+                    action = brain.get_controller_decision(
+                        player=fly_player,
+                        opponent=human_player,
+                        current_frame=step_count,
+                        stage=current_stage,
+                        opponents=active_opponents
+                    )
                     
                     # 5. Aplicar acciones en el mando de la mosca (P1) mediante transiciones limpias (Edge-Triggered)
                     # Se eliminó controller_fly.release_all() por frame para NO saturar el buffer FIFO de Dolphin
@@ -808,9 +846,13 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                             stage_display = f" en {stage_name_str}" if stage_name_str else ""
                             opp_label = f"CPU L{cpu_level}" if cpu_level else "Tú"
                             octo_val = action.get("stats", {}).get("octopamine", getattr(brain, "octopamine", 0.2))
+                            if len(active_opponents) > 1:
+                                opp_disp = f"{len(active_opponents)} BOTS FFA [Objetivo: {human_char_name} {p2_pct}% ({p2_stk}⭐)]"
+                            else:
+                                opp_disp = f"{opp_label}({human_char_name}): {p2_pct:3d}% ({p2_stk}⭐)"
                             print(f"[{step_count//60:3d}s] {action.get('name', 'COMBATE')} | "
                                   f"{p1_char_disp}(Mosca 400k): {p1_pct:3d}% ({p1_stk}⭐) vs "
-                                  f"{opp_label}({human_char_name}): {p2_pct:3d}% ({p2_stk}⭐){stage_display} | "
+                                  f"{opp_disp}{stage_display} | "
                                   f"🧠 Dopa:{int(dopa_val*100)}% {dopa_icon} Endo:{int(endo_val*100)}% 🛡️{flow_str} {combo_str} | Octo:{int(octo_val*100)}%")
                         except Exception:
                             pass

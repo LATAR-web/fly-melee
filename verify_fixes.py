@@ -31,7 +31,7 @@ class MockPos:
         self.y = float(y)
 
 class MockPlayer:
-    def __init__(self, x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=0.0, stock=4, jumps_left=1):
+    def __init__(self, x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14, percent=0.0, stock=4, jumps_left=1, invulnerable=False):
         self.position = MockPos(x, y)
         self.on_ground = on_ground
         self.action = action
@@ -39,6 +39,7 @@ class MockPlayer:
         self.percent = float(percent)
         self.stock = int(stock)
         self.jumps_left = jumps_left
+        self.invulnerable = invulnerable
         self.hitstun_frames_left = 0
         self.speed_x_attack = 0.0
         self.speed_y_attack = 0.0
@@ -2242,8 +2243,91 @@ def run_tests():
     assert not act_edge_neutral["jump"], "Luigi no debe saltar hacia el borde exterior en neutral"
     print("✅ TEST 100 SUPERADO: Cero deslizamientos o saltos suicidas offstage por pista insuficiente.")
 
+    # -------------------------------------------------------------
+    # TEST 101: Target Selection IQ en Free-For-All (FFA / Multi-Bot)
+    # -------------------------------------------------------------
+    print("\n--- Test 101: Target Selection IQ en FFA (Multi-Bot) ---")
+    brain.reset()
+    p_luigi_ffa = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_ffa.character = "LUIGI"
+
+    # Bot 1: Muerto (stock = 0)
+    bot_dead = MockPlayer(x=10.0, y=0.0, on_ground=True, action="DEAD_FALL", act_val=35, stock=0)
+    # Bot 2: En plataforma de respawn / invulnerable (halo)
+    bot_halo = MockPlayer(x=5.0, y=20.0, on_ground=True, action="REBIRTH_WAIT", act_val=11, stock=3, invulnerable=True)
+    # Bot 3: Vivo a media distancia pasivo (stock = 2, dist = 25u)
+    bot_passive = MockPlayer(x=25.0, y=0.0, on_ground=True, action="STANDING", act_val=14, stock=2, percent=20.0)
+    # Bot 4: Amenaza directa atacando de cerca (stock = 1, dist = 8u, atacando)
+    bot_threat = MockPlayer(x=8.0, y=0.0, on_ground=True, action="ATTACK_DASH", act_val=45, stock=1, percent=65.0)
+
+    all_bots = [bot_dead, bot_halo, bot_passive, bot_threat]
+    best_target = brain.select_best_target(p_luigi_ffa, all_bots, stage_edge=68.4)
+    print(f"Mejor objetivo seleccionado: Bot con stock={best_target.stock}, x={best_target.position.x}, action={best_target.action}")
+    assert best_target == bot_threat, "Target selection debe priorizar la amenaza viva cercana sobre bots muertos, en halo o pasivos"
+
+    # Estimulación sensorial multi-oponente
+    brain.stimulate_sensory(threat_level=0.7, rel_x=0.2, rel_y=0.0, is_offstage=False, looming_rate=0.5, player=p_luigi_ffa, opponent=best_target, current_frame=4000, opponents=all_bots)
+    print(f"Cluster 5 (Giant Fiber) spikes post estimulación FFA: {float(brain.spikes[brain.map_gf].sum()):.2f}")
+    print("✅ TEST 101 SUPERADO: Target Selection IQ prioriza amenazas vivas e ignora bots muertos o invulnerables en respawn.")
+
+    # -------------------------------------------------------------
+    # TEST 102: Anti-Pinch Crowd Control (Ruptura de Emboscadas 360°)
+    # -------------------------------------------------------------
+    print("\n--- Test 102: Anti-Pinch Crowd Control (Ruptura de Emboscadas 360°) ---")
+    brain.reset()
+    p_luigi_pinched = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_pinched.character = "LUIGI"
+
+    # Dos bots encerrando a Luigi por ambos flancos (izq y der < 9u)
+    bot_left = MockPlayer(x=-7.5, y=0.0, on_ground=True, action="ATTACK_DASH", act_val=45, stock=2)
+    bot_right = MockPlayer(x=7.0, y=0.0, on_ground=True, action="ATTACK_DASH", act_val=45, stock=2)
+    pinch_bots = [bot_left, bot_right]
+
+    act_pinch_luigi = brain.get_luigi_decision(player=p_luigi_pinched, opponent=bot_right, opponents=pinch_bots, current_frame=4000, stage="BATTLEFIELD")
+    print(f"Luigi Anti-Pinch Action: {act_pinch_luigi['name']} | Attack={act_pinch_luigi['attack']} | Special={act_pinch_luigi['special']}")
+    assert "ANTI-PINCH" in act_pinch_luigi["name"]
+    # Debe ser Cyclone 360° o Down-Smash sweep
+    assert (act_pinch_luigi["special"] and act_pinch_luigi["stick_y"] == 0.0) or (act_pinch_luigi["attack"] and act_pinch_luigi["stick_y"] == 0.25)
+
+    # Fox Anti-Pinch Shine 360°
+    brain.reset()
+    p_fox_pinched = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_pinched.character = "FOX"
+    act_pinch_fox = brain.get_fox_decision(player=p_fox_pinched, opponent=bot_right, opponents=pinch_bots, current_frame=4001, stage="BATTLEFIELD")
+    print(f"Fox Anti-Pinch Action: {act_pinch_fox['name']} | Special={act_pinch_fox['special']} | Stick Y={act_pinch_fox['stick_y']}")
+    assert "ANTI-PINCH FOX SHINE 360°" in act_pinch_fox["name"]
+    assert act_pinch_fox["special"] and act_pinch_fox["stick_y"] == 0.0
+    print("✅ TEST 102 SUPERADO: Anti-Pinch Crowd Control activado con éxito para romper ataques en pinza 360°.")
+
+    # -------------------------------------------------------------
+    # TEST 103: Multi-Bot Re-Targeting & Cero Taunts si hay Rivales Vivos
+    # -------------------------------------------------------------
+    print("\n--- Test 103: Multi-Bot Re-Targeting & Cero Taunts si hay Rivales Vivos ---")
+    brain.reset()
+    p_luigi_multi = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_luigi_multi.character = "LUIGI"
+
+    # Rival A está en el halo de respawn, pero Rival B está vivo y en el escenario
+    bot_a_halo = MockPlayer(x=0.0, y=25.0, on_ground=True, action="REBIRTH_WAIT", act_val=11, stock=2, invulnerable=True)
+    bot_b_active = MockPlayer(x=20.0, y=0.0, on_ground=True, action="STANDING", act_val=14, stock=2, percent=40.0)
+    active_opps = [bot_a_halo, bot_b_active]
+
+    # Al pasar bot_a_halo como 'opponent' pero bot_b_active en 'opponents', Luigi NO debe tauntear ni bailar
+    act_no_taunt = brain.get_luigi_decision(player=p_luigi_multi, opponent=bot_a_halo, opponents=active_opps, current_frame=5000, stage="BATTLEFIELD")
+    print(f"Luigi FFA Decision vs Halo (con otro rival vivo): {act_no_taunt['name']}")
+    assert "TAUNT" not in act_no_taunt["name"], "Luigi NUNCA debe tauntear si hay otros bots vivos en el combate"
+    assert "TEABAG" not in act_no_taunt["name"], "Luigi NUNCA debe hacer teabag si hay otros bots vivos en el combate"
+
+    # Fox tampoco debe tauntear
+    p_fox_multi = MockPlayer(x=0.0, y=0.0, on_ground=True, action="STANDING", act_val=14)
+    p_fox_multi.character = "FOX"
+    act_fox_no_taunt = brain.get_fox_decision(player=p_fox_multi, opponent=bot_a_halo, opponents=active_opps, current_frame=5001, stage="BATTLEFIELD")
+    print(f"Fox FFA Decision vs Halo (con otro rival vivo): {act_fox_no_taunt['name']}")
+    assert "TAUNT" not in act_fox_no_taunt["name"], "Fox NUNCA debe tauntear si hay otros bots vivos en el combate"
+    print("✅ TEST 103 SUPERADO: Re-targeting instantáneo y cero congelamientos/taunts cuando hay otros bots vivos.")
+
     print("\n" + "=" * 70)
-    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (100/100 SUPERADAS)")
+    print("🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (103/103 SUPERADAS)")
     print("=" * 70)
 
 if __name__ == "__main__":

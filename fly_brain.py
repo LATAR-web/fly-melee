@@ -821,6 +821,10 @@ class FlyBrain:
         self.prev_p2_stock = 4
         self.prev_p1_percent = 0.0
         self.prev_p2_percent = 0.0
+        self.prev_opponent_stocks = {}
+        self.prev_opponent_percents = {}
+        self.prev_opponent_dists = {}
+        self.is_pinch_trap = False
         self.combo_count = 0
         self.consecutive_combos = 0
         self.death_penalty_frames = 0
@@ -901,10 +905,22 @@ class FlyBrain:
         self.missile_is_defensive = is_defensive
         self.last_luigi_power = "GREEN_MISSILE"
 
-    def stimulate_sensory(self, threat_level, rel_x=0.0, rel_y=0.0, is_offstage=False, looming_rate=0.0, player=None, opponent=None, current_frame=0):
+    def stimulate_sensory(self, threat_level, rel_x=0.0, rel_y=0.0, is_offstage=False, looming_rate=0.0, player=None, opponent=None, current_frame=0, opponents=None):
         """Inyecta corriente en las neuronas sensoriales y modula la neuroquímica con premios y castigos biológicos."""
         stock_lost_this_frame = False
-        if player is not None and opponent is not None:
+        opp_list = [o for o in (opponents if opponents is not None and len(opponents) > 0 else ([opponent] if opponent is not None else [])) if o is not None]
+
+        # Detección de trampa sándwich / cerco (Pinch Trap) en combates de múltiples rivales
+        self.is_pinch_trap = False
+        if player is not None and len(opp_list) >= 2:
+            px_val = float(getattr(player.position, "x", 0.0))
+            py_val = float(getattr(player.position, "y", 0.0))
+            left_threats = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) < (px_val - 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px_val, float(getattr(o.position, "y", 0.0)) - py_val) < 32.0 and int(getattr(o, "stock", 1)) > 0]
+            right_threats = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) > (px_val + 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px_val, float(getattr(o.position, "y", 0.0)) - py_val) < 32.0 and int(getattr(o, "stock", 1)) > 0]
+            if len(left_threats) > 0 and len(right_threats) > 0:
+                self.is_pinch_trap = True
+
+        if player is not None and len(opp_list) > 0:
             # 1. Castigo por muerte y reajuste de combate
             current_p1_stock = int(getattr(player, "stock", self.prev_p1_stock))
             if current_p1_stock > self.prev_p1_stock:
@@ -939,60 +955,99 @@ class FlyBrain:
             else:
                 self.prev_p1_stock = current_p1_stock
 
-            # 2. Recompensa máxima por K.O. al rival
-            current_p2_stock = int(getattr(opponent, "stock", self.prev_p2_stock))
-            if current_p2_stock > self.prev_p2_stock:
-                self.prev_p2_stock = current_p2_stock
-            elif current_p2_stock < self.prev_p2_stock and self.prev_p2_stock > 0:
-                self.dopamine = 1.0           # 100% DOPAMINA: ÉXITO ABSOLUTO
-                self.endorphin = max(0.80, min(1.0, getattr(self, "endorphin", 0.70) + 0.25)) # Éxtasis de victoria
-                self.octopamine = 0.10
-                self.combo_count += 3
-                self.consecutive_combos += 1
-                self.prev_p2_stock = current_p2_stock
-                self.learn_from_success("KO")
-                print(f"🏆 [FlyBrain] ¡K.O. LOGRADO! Rival eliminado ({current_p2_stock}⭐). DOPAMINA AL 100% (Adicción a Ganar Satisfecha).")
-            else:
-                self.prev_p2_stock = current_p2_stock
+            # 2. Recompensa máxima por K.O. a cualquiera de los rivales (Multi-Opponent K.O. Tracking)
+            for idx, opp in enumerate(opp_list):
+                opp_id = getattr(opp, "port", idx)
+                prev_stk = self.prev_opponent_stocks.get(opp_id, int(getattr(opp, "stock", self.prev_p2_stock)))
+                curr_stk = int(getattr(opp, "stock", prev_stk))
+                if curr_stk > prev_stk:
+                    self.prev_opponent_stocks[opp_id] = curr_stk
+                elif curr_stk < prev_stk and prev_stk > 0:
+                    self.dopamine = 1.0           # 100% DOPAMINA: ÉXITO ABSOLUTO
+                    self.endorphin = max(0.80, min(1.0, getattr(self, "endorphin", 0.70) + 0.25)) # Éxtasis de victoria
+                    self.octopamine = 0.10
+                    self.combo_count += 3
+                    self.consecutive_combos += 1
+                    self.prev_opponent_stocks[opp_id] = curr_stk
+                    self.learn_from_success("KO")
+                    print(f"🏆 [FlyBrain] ¡K.O. LOGRADO! Rival {opp_id} eliminado ({curr_stk}⭐). DOPAMINA AL 100% (Adicción a Ganar Satisfecha).")
+                else:
+                    self.prev_opponent_stocks[opp_id] = curr_stk
 
-            # 3. Recompensa dopaminérgica por conectar combos
-            p2_pct = float(getattr(opponent, "percent", self.prev_p2_percent))
-            delta_p2 = p2_pct - self.prev_p2_percent
-            if delta_p2 > 0:
-                self.combo_count += 1
-                self.last_hit_frame = current_frame
-                self.learn_from_success("COMBO", value=delta_p2)
-                self.learn_from_success("DAMAGE_DEALT", value=delta_p2)
-                
-                combo_multiplier = 1.0 + min(3.0, self.combo_count * 0.4)
-                dopamine_gain = (delta_p2 * 0.04 + 0.22) * combo_multiplier
-                
-                if self.combo_state in ["UPTHROW_UAIR", "UPTHROW_JUMP", "LUIGI_DTHROW_COMBO"]:
-                    dopamine_gain += 0.40
-                elif self.combo_state == "RUNNING_JC_UPSMASH":
-                    dopamine_gain += 0.35
-                elif self.combo_state == "WAVESHINE_COMBO":
-                    dopamine_gain += 0.45
-                    self.learn_from_success("WAVESHINE")
-                elif getattr(self, "edgeguard_state", None) == "OFFSTAGE_SHINE":
-                    dopamine_gain += 0.50
-                    self.learn_from_success("OFFSTAGE_SHINE")
-                elif self.combo_state == "TECH_CHASE":
-                    dopamine_gain += 0.30
-                elif getattr(self, "last_luigi_power", None) == "UPB_SHORYUKEN":
-                    dopamine_gain += 0.50
-                    self.learn_from_success("SHORYUKEN_SWEETSPOT")
-                elif getattr(self, "last_luigi_power", None) == "GREEN_MISSILE":
-                    dopamine_gain += 0.45
-                elif getattr(self, "last_luigi_power", None) == "CYCLONE":
-                    dopamine_gain += 0.35
-                    
-                self.dopamine = min(1.0, self.dopamine + dopamine_gain)
-                self.octopamine = max(0.10, self.octopamine - 0.10)
-            else:
+            # Compatibilidad 1v1 con prev_p2_stock
+            if opponent is not None:
+                current_p2_stock = int(getattr(opponent, "stock", self.prev_p2_stock))
+                if current_p2_stock > self.prev_p2_stock:
+                    self.prev_p2_stock = current_p2_stock
+                elif current_p2_stock < self.prev_p2_stock and self.prev_p2_stock > 0:
+                    self.dopamine = 1.0
+                    self.endorphin = max(0.80, min(1.0, getattr(self, "endorphin", 0.70) + 0.25))
+                    self.octopamine = 0.10
+                    self.combo_count += 3
+                    self.consecutive_combos += 1
+                    self.prev_p2_stock = current_p2_stock
+                    self.learn_from_success("KO")
+                    print(f"🏆 [FlyBrain] ¡K.O. LOGRADO! Rival eliminado ({current_p2_stock}⭐). DOPAMINA AL 100% (Adicción a Ganar Satisfecha).")
+                else:
+                    self.prev_p2_stock = current_p2_stock
+
+            # 3. Recompensa dopaminérgica por conectar combos y daño en cualquiera de los rivales
+            any_damage_dealt = False
+            for idx, opp in enumerate(opp_list):
+                opp_id = getattr(opp, "port", idx)
+                prev_pct = self.prev_opponent_percents.get(opp_id, float(getattr(opp, "percent", 0.0)))
+                curr_pct = float(getattr(opp, "percent", prev_pct))
+                delta_pct = curr_pct - prev_pct
+                if delta_pct > 0:
+                    any_damage_dealt = True
+                    self.combo_count += 1
+                    self.last_hit_frame = current_frame
+                    self.learn_from_success("COMBO", value=delta_pct)
+                    self.learn_from_success("DAMAGE_DEALT", value=delta_pct)
+                    combo_multiplier = 1.0 + min(3.0, self.combo_count * 0.4)
+                    dopamine_gain = (delta_pct * 0.04 + 0.22) * combo_multiplier
+                    if self.combo_state in ["UPTHROW_UAIR", "UPTHROW_JUMP", "LUIGI_DTHROW_COMBO"]:
+                        dopamine_gain += 0.40
+                    elif self.combo_state == "RUNNING_JC_UPSMASH":
+                        dopamine_gain += 0.35
+                    elif self.combo_state == "WAVESHINE_COMBO":
+                        dopamine_gain += 0.45
+                        self.learn_from_success("WAVESHINE")
+                    elif getattr(self, "edgeguard_state", None) == "OFFSTAGE_SHINE":
+                        dopamine_gain += 0.50
+                        self.learn_from_success("OFFSTAGE_SHINE")
+                    elif self.combo_state == "TECH_CHASE":
+                        dopamine_gain += 0.30
+                    elif getattr(self, "last_luigi_power", None) == "UPB_SHORYUKEN":
+                        dopamine_gain += 0.50
+                        self.learn_from_success("SHORYUKEN_SWEETSPOT")
+                    elif getattr(self, "last_luigi_power", None) == "GREEN_MISSILE":
+                        dopamine_gain += 0.45
+                    elif getattr(self, "last_luigi_power", None) == "CYCLONE":
+                        dopamine_gain += 0.35
+                    self.dopamine = min(1.0, self.dopamine + dopamine_gain)
+                    self.octopamine = max(0.10, self.octopamine - 0.10)
+                self.prev_opponent_percents[opp_id] = curr_pct
+
+            if opponent is not None:
+                p2_pct = float(getattr(opponent, "percent", self.prev_p2_percent))
+                delta_p2 = p2_pct - self.prev_p2_percent
+                if delta_p2 > 0 and not any_damage_dealt:
+                    self.combo_count += 1
+                    self.last_hit_frame = current_frame
+                    self.learn_from_success("COMBO", value=delta_p2)
+                    self.learn_from_success("DAMAGE_DEALT", value=delta_p2)
+                    combo_multiplier = 1.0 + min(3.0, self.combo_count * 0.4)
+                    dopamine_gain = (delta_p2 * 0.04 + 0.22) * combo_multiplier
+                    self.dopamine = min(1.0, self.dopamine + dopamine_gain)
+                    self.octopamine = max(0.10, self.octopamine - 0.10)
+                elif not any_damage_dealt:
+                    if current_frame > self.last_hit_frame + 90:
+                        self.combo_count = 0
+                self.prev_p2_percent = p2_pct
+            elif not any_damage_dealt:
                 if current_frame > self.last_hit_frame + 90:
                     self.combo_count = 0
-            self.prev_p2_percent = p2_pct
 
             # 4. Modulación por daño recibido y castigo por ser agarrado en neutral
             p1_act_str = str(getattr(player, "action", ""))
@@ -1206,6 +1261,87 @@ class FlyBrain:
         self.refractory = np.maximum(0, self.refractory - 1)
         
         return self.spikes
+
+    def select_best_target(self, player, opponents, stage_edge=68.4):
+        """
+        SELECCIONADOR DE OBJETIVO INTELIGENTE (MULTI-BOT & FFA TARGET SELECTION IQ):
+        En combates multitudinarios (1v3, 4 Bots campales o Free-For-All), evalúa en tiempo real
+        a todos los rivales vivos y selecciona el objetivo óptimo basado en:
+        1. Descarte total de rivales eliminados (stock <= 0).
+        2. Penalización estricta de rivales invulnerables (plataforma de respawn o invulnerabilidad > 30 frames).
+        3. Proximidad y urgencia táctica: rivales más cercanos reciben máxima prioridad.
+        4. Amenaza inmediata: rival atacando o corriendo hacia la mosca a quemarropa (+90 pts).
+        5. Oportunidad de Kill Confirm: rival en hitstun, tumble o porcentaje de K.O. (+75 pts).
+        6. Descarte de rivales en caída irreversible al abismo si hay enemigos en el escenario.
+        """
+        if not opponents:
+            return None
+        valid_opps = [o for o in opponents if o is not None]
+        if not valid_opps:
+            return None
+        if len(valid_opps) == 1:
+            return valid_opps[0]
+
+        if player is None:
+            return valid_opps[0]
+
+        px = float(getattr(player.position, "x", 0.0))
+        py = float(getattr(player.position, "y", 0.0))
+
+        best_target = None
+        best_score = -1e9
+
+        for opp in valid_opps:
+            opp_stk = int(getattr(opp, "stock", 1))
+            opp_act_str = str(getattr(opp, "action", ""))
+            opp_act_val = getattr(opp.action, "value", getattr(opp, "act_val", 0))
+
+            # 1. Jugador totalmente eliminado de la partida
+            if opp_stk <= 0 or (opp_act_val in range(0, 11) and opp_stk <= 0):
+                continue
+
+            ox = float(getattr(opp.position, "x", 0.0))
+            oy = float(getattr(opp.position, "y", 0.0))
+            dist = math.hypot(ox - px, oy - py)
+
+            # 2. Puntuación base por proximidad (0 a 120)
+            score = 120.0 / (dist + 3.5)
+
+            # 3. Penalización de Respawn / Halo (no obsesionarse con rivales invencibles)
+            opp_on_halo = (opp_act_val in [11, 12, 13]) or ("HALO" in opp_act_str) or ("REBIRTH" in opp_act_str) or (opp_act_val in range(0, 11))
+            opp_invuln = getattr(opp, "invulnerability_left", 0)
+            opp_is_invuln = getattr(opp, "invulnerable", False) or (opp_invuln > 0)
+            if opp_on_halo or opp_is_invuln or opp_invuln > 30:
+                score -= 350.0
+
+            # 4. Penalización de rival en abismo profundo si otros están en el escenario
+            opp_offstage = getattr(opp, "off_stage", False) or abs(ox) > (stage_edge + 10.0) or oy < -12.0
+            if opp_offstage and oy < -15.0:
+                score -= 150.0
+
+            # 5. Amenaza Inmediata (rival atacando a quemarropa)
+            is_opp_attacking = ("ATTACK" in opp_act_str or "SMASH" in opp_act_str or "SPECIAL" in opp_act_str or opp_act_val in range(44, 75))
+            if dist <= 18.0:
+                if is_opp_attacking:
+                    score += 90.0
+                else:
+                    score += 35.0
+
+            # 6. Oportunidad de Kill Confirm / Combo (Hitstun, Tumble o Porcentaje de K.O.)
+            hitstun_left = getattr(opp, "hitstun_frames_left", 0)
+            is_opp_damaged = hitstun_left > 0 or ("DAMAGE" in opp_act_str) or (opp_act_val in range(75, 92)) or ("TUMBL" in opp_act_str)
+            if is_opp_damaged and dist <= 30.0:
+                score += 75.0
+
+            opp_pct = float(getattr(opp, "percent", 0.0))
+            if opp_pct >= 55.0 and dist <= 25.0:
+                score += 50.0
+
+            if score > best_score:
+                best_score = score
+                best_target = opp
+
+        return best_target if best_target is not None else valid_opps[0]
 
     def _enforce_safety(self, action, player, opponent, stage_edge=68.4):
         """
@@ -1554,7 +1690,7 @@ class FlyBrain:
 
     get_stage_edge = staticmethod(get_stage_edge)
 
-    def get_fox_decision(self, player=None, opponent=None, current_frame=0, stage=None):
+    def get_fox_decision(self, player=None, opponent=None, current_frame=0, stage=None, opponents=None):
         """
         MOTOR DE COMBATE COMPETITIVO DE FOX McCLOUD (NIVEL TOURNAMENT SSS / 20XX OMNI-STAGE):
         1. CONEXIÓN REAL CON EL CONECTOMA: Los clusters de neuronas descendentes (DNs), Giant Fiber
@@ -1667,6 +1803,17 @@ class FlyBrain:
                 "stats": stats
             }
 
+        if player is not None and opponents is not None and len(opponents) > 0:
+            opponent = self.select_best_target(player, opponents, stage_edge=stage_edge)
+
+        opp_list = [o for o in (opponents if opponents is not None and len(opponents) > 0 else ([opponent] if opponent is not None else [])) if o is not None]
+        other_active_opps = [
+            o for o in opp_list if o != opponent and int(getattr(o, "stock", 1)) > 0 and 
+            getattr(o.action, "value", getattr(o, "act_val", 0)) not in range(0, 11) and
+            "HALO" not in str(getattr(o, "action", "")) and getattr(o.action, "value", getattr(o, "act_val", 0)) not in [12, 13]
+        ]
+        has_other_active_opps = len(other_active_opps) > 0
+
         px = player.position.x
         py = player.position.y
         ox = opponent.position.x
@@ -1742,24 +1889,51 @@ class FlyBrain:
         # Solo invulnerabilidad de respawn (halo o > 40 frames); no congelar por rolls o spotdodges normales (<= 30 frames)
         opp_is_respawn_invuln = opp_on_halo or (getattr(opponent, "invulnerability_left", 0) > 40)
         if opp_on_halo:
-            if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 20.0):
-                if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
-                    return self._enforce_safety({
-                        "name": "🦊 SWAGGER 20XX: FOX TAUNT (COME ON! HUMILLACIÓN MENTAL)",
-                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
-                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
-                dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
-                return self._enforce_safety({
-                    "name": "🦊 SWAGGER 20XX: DASH-DANCE DE DOMINANCIA EN CENTRO",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
-                    "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+            if has_other_active_opps:
+                # Si hay otros rivales vivos, NUNCA quedarse bailando o esperando: reorientar combate
+                opponent = other_active_opps[0]
+                ox = float(opponent.position.x)
+                oy = float(opponent.position.y)
+                dx = ox - px
+                dy = oy - py
+                dist = math.hypot(dx, dy)
+                towards_opp = 1.0 if dx > 0 else 0.0
+                opp_act_str = str(opponent.action)
+                opp_act_val = getattr(opponent.action, "value", getattr(opponent, "act_val", 0))
+                opp_offstage = getattr(opponent, "off_stage", False) or (abs(ox) >= (stage_edge - 1.0) and oy < 1.0) or ("EDGE" in opp_act_str) or (opp_act_val in [252, 253])
+                opp_is_dead = False
+                opp_on_halo = False
+                opp_is_respawn_invuln = False
             else:
+                if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 20.0):
+                    if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                        return self._enforce_safety({
+                            "name": "🦊 SWAGGER 20XX: FOX TAUNT (COME ON! HUMILLACIÓN MENTAL)",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                            "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
+                    return self._enforce_safety({
+                        "name": "🦊 SWAGGER 20XX: DASH-DANCE DE DOMINANCIA EN CENTRO",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                        "stick_x": float(dance_x), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                        "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+
+        # ANTI-PINCH FOX SHINE 360° (FRAME-1 VÓRTICE REFLECTOR)
+        if getattr(player, "on_ground", True) and len(opp_list) >= 2:
+            left_flank = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) < (px - 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px, float(getattr(o.position, "y", 0.0)) - py) < 28.0 and int(getattr(o, "stock", 1)) > 0]
+            right_flank = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) > (px + 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px, float(getattr(o.position, "y", 0.0)) - py) < 28.0 and int(getattr(o, "stock", 1)) > 0]
+            if len(left_flank) > 0 and len(right_flank) > 0:
                 return self._enforce_safety({
-                    "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
-                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    "name": "✨ ANTI-PINCH FOX SHINE 360° (FRAME-1 VÓRTICE REFLECTOR)",
+                    "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                    "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
                 }, player, opponent, stage_edge=stage_edge)
 
         if opp_is_respawn_invuln:
@@ -2945,7 +3119,7 @@ class FlyBrain:
                 "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
-    def get_luigi_decision(self, player=None, opponent=None, current_frame=0, stage="BATTLEFIELD"):
+    def get_luigi_decision(self, player=None, opponent=None, current_frame=0, stage="BATTLEFIELD", opponents=None):
         """
         CEREBRO COMPETITIVO NIVEL SSS PARA LUIGI (Super Smash Bros Melee).
         Domina el metajuego con la tracción más resbaladiza (0.005), wavedashes legendarios,
@@ -3021,6 +3195,17 @@ class FlyBrain:
                 "c_stick_y": 0.5,
                 "stats": stats
             }
+
+        if player is not None and opponents is not None and len(opponents) > 0:
+            opponent = self.select_best_target(player, opponents, stage_edge=stage_edge)
+
+        opp_list = [o for o in (opponents if opponents is not None and len(opponents) > 0 else ([opponent] if opponent is not None else [])) if o is not None]
+        other_active_opps = [
+            o for o in opp_list if o != opponent and int(getattr(o, "stock", 1)) > 0 and 
+            getattr(o.action, "value", getattr(o, "act_val", 0)) not in range(0, 11) and
+            "HALO" not in str(getattr(o, "action", "")) and getattr(o.action, "value", getattr(o, "act_val", 0)) not in [12, 13]
+        ]
+        has_other_active_opps = len(other_active_opps) > 0
 
         px = float(player.position.x)
         py = float(player.position.y)
@@ -3120,27 +3305,43 @@ class FlyBrain:
         opp_is_respawn_invuln = opp_on_halo or (getattr(opponent, "invulnerability_left", 0) > 40)
 
         if opp_on_halo:
-            # Si el rival está muerto o en el halo de respawn: NUNCA atacar a la nada
-            if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 24.0):
-                if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
-                    return self._enforce_safety({
-                        "name": "👟 DISRESPECT EN RESPAWN: LUIGI TAUNT (HUMILLACIÓN MENTAL)",
-                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
-                        "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                    }, player, opponent, stage_edge=stage_edge)
-                dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
-                return self._enforce_safety({
-                    "name": "🟢 SWAGGER LUIGI 20XX: WAVEDASH DE DOMINANCIA EN CENTRO",
-                    "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False, "taunt": False,
-                    "stick_x": float(dance_x), "stick_y": 0.25 if (current_frame % 4 == 0) else 0.5,
-                    "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+            if has_other_active_opps:
+                # Si hay otros rivales vivos, NUNCA quedarse bailando o esperando: reorientar combate
+                opponent = other_active_opps[0]
+                ox = float(opponent.position.x)
+                oy = float(opponent.position.y)
+                dx = ox - px
+                dy = oy - py
+                dist = math.hypot(dx, dy)
+                towards_opp = 1.0 if dx > 0 else 0.0
+                opp_act_str = str(opponent.action)
+                opp_act_val = getattr(opponent.action, "value", getattr(opponent, "act_val", 0))
+                opp_offstage = getattr(opponent, "off_stage", False) or (abs(ox) >= (stage_edge - 1.0) and oy < 1.0) or ("EDGE" in opp_act_str) or (opp_act_val in [252, 253])
+                opp_is_dead = False
+                opp_on_halo = False
+                opp_is_respawn_invuln = False
             else:
-                return self._enforce_safety({
-                    "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
-                    "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
-                    "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
-                }, player, opponent, stage_edge=stage_edge)
+                # Si el rival está muerto o en el halo de respawn: NUNCA atacar a la nada
+                if getattr(player, "on_ground", True) and abs(px) < (stage_edge - 24.0):
+                    if (current_frame // 35) % 2 == 0 and self.dopamine > 0.50:
+                        return self._enforce_safety({
+                            "name": "👟 DISRESPECT EN RESPAWN: LUIGI TAUNT (HUMILLACIÓN MENTAL)",
+                            "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": True,
+                            "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    dance_x = 1.0 if (current_frame // 4) % 2 == 0 else 0.0
+                    return self._enforce_safety({
+                        "name": "🟢 SWAGGER LUIGI 20XX: WAVEDASH DE DOMINANCIA EN CENTRO",
+                        "jump": False, "attack": False, "special": False, "shield": (current_frame % 4 == 0), "grab": False, "taunt": False,
+                        "stick_x": float(dance_x), "stick_y": 0.25 if (current_frame % 4 == 0) else 0.5,
+                        "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
+                else:
+                    return self._enforce_safety({
+                        "name": "🏃 RETORNO A CENTRO EN RESPAWN RIVAL",
+                        "jump": False, "attack": False, "special": False, "shield": False, "grab": False, "taunt": False,
+                        "stick_x": float(dir_to_stage), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                    }, player, opponent, stage_edge=stage_edge)
 
         if opp_is_respawn_invuln:
             # Si el rival desciende con invulnerabilidad de respawn: respetarla, no golpear al vacío
@@ -3170,7 +3371,7 @@ class FlyBrain:
         opp_pct = float(getattr(opponent, "percent", 0.0))
         is_dying_abyss = opp_offstage and oy < -10.0 and opp_pct >= 55.0
         is_shoryu_ceiling = (getattr(self, "last_luigi_power", "") == "UPB_SHORYUKEN") and (oy > 25.0) and (opp_pct >= 55.0)
-        if (is_dying_abyss or is_shoryu_ceiling) and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
+        if (is_dying_abyss or is_shoryu_ceiling) and not has_other_active_opps and getattr(player, "on_ground", True) and abs(px) < (stage_edge - 12.0):
             teabag_y = 0.0 if (current_frame % 4 < 2) else 0.5
             return self._enforce_safety({
                 "name": "👟 HUMILLACIÓN 20XX: RAPID TEABAG DISRESPECT (SPAM ABAJO)",
@@ -3577,6 +3778,52 @@ class FlyBrain:
                 }, player, opponent, stage_edge=stage_edge)
         else:
             self.shield_frames = 0
+
+        # =========================================================================
+        # 4.9. ANTI-PINCH CROWD CONTROL (ANTI-CERCO EN BATALLAS MULTI-BOT / FFA)
+        # =========================================================================
+        if getattr(player, "on_ground", True) and len(opp_list) >= 2:
+            left_flank = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) < (px - 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px, float(getattr(o.position, "y", 0.0)) - py) < 30.0 and int(getattr(o, "stock", 1)) > 0]
+            right_flank = [o for o in opp_list if float(getattr(o.position, "x", 0.0)) > (px + 2.0) and math.hypot(float(getattr(o.position, "x", 0.0)) - px, float(getattr(o.position, "y", 0.0)) - py) < 30.0 and int(getattr(o, "stock", 1)) > 0]
+            if len(left_flank) > 0 and len(right_flank) > 0:
+                closest_left_dist = min(math.hypot(float(o.position.x) - px, float(o.position.y) - py) for o in left_flank)
+                closest_right_dist = min(math.hypot(float(o.position.x) - px, float(o.position.y) - py) for o in right_flank)
+                min_flank_dist = min(closest_left_dist, closest_right_dist)
+
+                # Si ambos están a quemarropa (< 9.0 u): Barricada 360° con Cyclone o Down-Smash doble
+                if min_flank_dist <= 9.0:
+                    if current_frame % 2 == 0:
+                        self.cyclone_ground_primed = True
+                        return self._enforce_safety({
+                            "name": "🌪️ ANTI-PINCH CROWD CONTROL: LUIGI CYCLONE 360° (DESPEJE MULTI-BOT)",
+                            "jump": False, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        return self._enforce_safety({
+                            "name": "💥 ANTI-PINCH CROWD CONTROL: DOWN-SMASH FRAME-5 (DOBLE BARRIDO)",
+                            "jump": False, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": 0.5, "stick_y": 0.0, "c_stick_x": 0.5, "c_stick_y": 0.0, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                else:
+                    # Escape vertical / Wavedash para reposicionarse fuera del sándwich
+                    if current_frame % 3 == 0:
+                        self._set_luigi_jump("AERIAL_NAIR", current_frame)
+                        return self._enforce_safety({
+                            "name": "🦘 ANTI-PINCH ESCAPE VERTICAL: SHORT-HOP NAIR FRAME-3",
+                            "jump": True, "attack": True, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 0.65, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
+                    else:
+                        escape_dir = 0.0 if closest_left_dist < closest_right_dist else 1.0
+                        self.luigi_jump_action = "WAVEDASH"
+                        self.luigi_wd_dir = escape_dir
+                        self.luigi_jump_frame = current_frame
+                        return self._enforce_safety({
+                            "name": "⚡ ANTI-PINCH REPOSICIONAMIENTO: WAVEDASH FUERA DEL CERCO",
+                            "jump": True, "attack": False, "special": False, "shield": False, "grab": False,
+                            "stick_x": float(escape_dir), "stick_y": 0.25, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
 
         # =========================================================================
         # 5. AGARRES Y MÁQUINA DE COMBOS ESTRATIFICADA POR DOPAMINA (Requisito 3)
@@ -5026,12 +5273,12 @@ class FlyBrain:
                 "stick_x": float(towards_opp), "stick_y": 0.5, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
             }, player, opponent, stage_edge=stage_edge)
 
-    def get_controller_decision(self, player=None, opponent=None, current_frame=0, stage="BATTLEFIELD"):
+    def get_controller_decision(self, player=None, opponent=None, current_frame=0, stage="BATTLEFIELD", opponents=None):
         """Decide la acción del personaje según el personaje activo o seleccionado."""
         p_char = getattr(player, "character", None) if player is not None else None
         active_char = getattr(self, "active_character", "LUIGI")
         c_str = str(p_char).upper() if p_char is not None else active_char.upper()
         if "FOX" in c_str and "LUIGI" not in c_str:
-            return self.get_fox_decision(player, opponent, current_frame=current_frame, stage=stage)
+            return self.get_fox_decision(player, opponent, current_frame=current_frame, stage=stage, opponents=opponents)
         # Por defecto la mosca controla a LUIGI
-        return self.get_luigi_decision(player, opponent, current_frame=current_frame, stage=stage)
+        return self.get_luigi_decision(player, opponent, current_frame=current_frame, stage=stage, opponents=opponents)
