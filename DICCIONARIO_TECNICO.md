@@ -10,12 +10,12 @@
 
 | Letra | Términos Clave |
 |:---:|---|
-| **A** | [ASDI](#asdi-automatic-smash-directional-influence) • [AVX2 / AVX-512](#avx2--avx-512) • [ActionState](#actionstate) • [Asyncio](#asyncio) |
+| **A** | [Anti-Pinch Crowd Control](#anti-pinch-crowd-control) • [ASDI](#asdi-automatic-smash-directional-influence) • [AVX2 / AVX-512](#avx2--avx-512) • [ActionState](#actionstate) • [Asyncio](#asyncio) |
 | **B** | [B-Air Dropkick](#b-air-dropkick-back-air) • [Big-O Notation](#notación-big-o) • [Brújula Central (CX)](#complejo-central-cx) |
-| **C** | [CSC (Compressed Sparse Column)](#formato-csc-compressed-sparse-column) • [CSR](#formato-csr-compressed-sparse-row) • [Crouch Cancel (CC)](#crouch-cancel-cc) • [Chaingrab](#chaingrab) • [Conectoma](#conectoma-connectome) • [CFF](#cff-critical-flicker-fusion-frequency) |
+| **C** | [CSC (Compressed Sparse Column)](#formato-csc-compressed-sparse-column) • [CSR](#formato-csr-compressed-sparse-row) • [Crouch Cancel (CC)](#crouch-cancel-cc) • [Chaingrab](#chaingrab) • [Conectoma](#conectoma-connectome) • [CFF](#cff-critical-flicker-fusion-frequency) • [Crowd Control](#anti-pinch-crowd-control) |
 | **D** | [Dopamina PAM](#dopamina-pam-protocerebral-anterior-medial) • [DNs (Neuronas Descendentes)](#neuronas-descendentes-dns) • [DNp01](#giant-fiber-dnp01) • [DI (Directional Influence)](#di-directional-influence) • [Down-Tilt Launcher](#down-tilt-launcher) • [Drill-Shine](#drill-shine) |
-| **E** | [ENet](#protocolo-enet) • [Evdev](#evdev) • [Edge-Cancel](#edge-cancel) • [Evasión Saccádica](#evasión-saccádica-escape-saccade) • [Espiga (Spike)](#espiga-potencial-de-acción--spike) |
-| **F** | [Float32 vs Float64](#aritmética-ieee-754-float32-vs-float64) • [FlyWire](#flywire) • [Fast-Fall](#fast-fall-ff) • [Frame Data](#frame-data) • [Frame-1](#frame-1) • [Freefall](#special-fall-freefall) |
+| **E** | [ENet](#protocolo-enet) • [Evdev](#evdev) • [Edge-Cancel](#edge-cancel) • [Edge-Triggered Input](#edge-triggered-input-pipeline-controlador-por-flanco) • [Endorfinas (Flow State 20XX)](#endorfinas-y-flow-state-20xx) • [Evasión Saccádica](#evasión-saccádica-escape-saccade) • [Espiga (Spike)](#espiga-potencial-de-acción--spike) |
+| **F** | [FFA (Free-For-All)](#ffa-free-for-all--target-selection-iq) • [Fix Bluetooth Gamepad](#fix_bluetooth_gamepad-sh--ps1) • [Float32 vs Float64](#aritmética-ieee-754-float32-vs-float64) • [FlyWire](#flywire) • [Fast-Fall](#fast-fall-ff) • [Frame Data](#frame-data) • [Frame-1](#frame-1) • [Freefall](#special-fall-freefall) |
 | **G** | [Giant Fiber](#giant-fiber-dnp01) • [Green Missile](#green-missile-side-b) |
 | **H** | [Hitlag](#hitlag-freeze-frames) • [Hitstun](#hitstun) • [Head-of-line Blocking](#head-of-line-blocking) • [Hiperpolarización](#hiperpolarización-y-periodo-refractario) |
 | **I** | [Ioctl](#ioctl) • [IPC](#ipc-inter-process-communication) • [Intangibilidad](#intangibilidad-invincibility-frames) |
@@ -24,13 +24,14 @@
 | **M** | [Mashing](#mashing) • [Meteor Spike](#meteor-spike) • [Multishine](#multishine) |
 | **N** | [NumPy](#numpy) • [Neuromodulación](#neuromodulación) • [N-Air Frame-3](#n-air-frame-3) |
 | **O** | [Octopamina PPL1](#octopamina-ppl1) • [Out of Shield (OoS)](#out-of-shield-oos) • [Flujo Óptico](#flujo-óptico-optic-flow) |
-| **P** | [Powershield](#powershield-frame-1) • [Py-UBJSON](#py-ubjson) • [Prefetching](#hardware-prefetching) |
+| **P** | [Powershield](#powershield-frame-1) • [Psutil](#psutil) • [Pygame](#pygame) • [Py-UBJSON](#py-ubjson) • [Prefetching](#hardware-prefetching) |
 | **R** | [Runway Barrier](#runway-barrier-barrera-de-pista) • [Ring Buffer](#lockless-ring-buffer-buffer-circular-sin-bloqueos) • [Refractario](#hiperpolarización-y-periodo-refractario) |
-| **S** | [SDI](#sdi-smash-directional-influence) • [STDP](#stdp-spike-timing-dependent-plasticity) • [Slippi](#project-slippi) • [Shine](#shine-reflector-frame-1) • [SHDL](#shdl-short-hop-double-laser) • [Sweetspot](#sweetspot-punto-dulce) • [Semi-Spike](#semi-spike) |
-| **T** | [Tech-Chase](#tech-chase) • [Teching](#tech--teching) • [Tracción / Fricción](#tracción--fricción-traction) |
+| **S** | [SDI](#sdi-smash-directional-influence) • [STDP](#stdp-spike-timing-dependent-plasticity) • [Slippi](#project-slippi) • [Shine](#shine-reflector-frame-1) • [SHDL](#shdl-short-hop-double-laser) • [Start Scripts (start_fly / start_dolphin)](#scripts-de-arranque-multiplataforma-start_flysh--start_flyps1) • [Sweetspot](#sweetspot-punto-dulce) • [Semi-Spike](#semi-spike) |
+| **T** | [Target Selection IQ](#ffa-free-for-all--target-selection-iq) • [Tech-Chase](#tech-chase) • [Teching](#tech--teching) • [Tracción / Fricción](#tracción--fricción-traction) |
 | **U** | [UBJSON](#py-ubjson) • [Unix Pipes](#unix-pipes-named-pipes--fifo) • [Up-B Shoryuken](#sweetspot-punto-dulce) |
 | **V** | [VNC (Cordón Nervioso Ventral)](#cordón-nervioso-ventral-vnc) • [Vectorización SIMD](#simd-single-instruction-multiple-data) |
-| **W** | [Wavedash](#wavedash) • [Waveland](#waveland) • [Waveshine](#waveshine) • [Whiff Punish](#whiff-punish) • [Wiggle-Out](#wiggle-out) |
+| **W** | [Wavedash](#wavedash) • [Waveland](#waveland) • [Waveshine](#waveshine) • [Whiff Punish](#whiff-punish) • [Wiggle-Out](#wiggle-out) • [Windows Compatibility](#capa-de-compatibilidad-multiplataforma-linux--windows) |
+| **X** | [XInput / DirectInput](#xinput--directinput-winmm) |
 | **2** | [20XX](#20xx) |
 
 ---
@@ -40,7 +41,7 @@
 ### Conectoma (Connectome)
 - **Definición**: El mapa completo de cableado anatómico de un sistema nervioso, detallando cada neurona individual y cada una de las uniones sinápticas que las conectan.
 - **En palabras sencillas**: Es el "plano de circuitos" o la placa madre de un cerebro biológico a resolución nanométrica.
-- **En Fly-Melee**: Corresponde al conjunto de datos **FlyWire** (reconstrucción de microscopía electrónica de la Universidad de Princeton) que contiene **395,144 neuronas** y **72,951,370 sinapsis**, cargado en memoria RAM en [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L620-L688).
+- **En Fly-Melee**: Corresponde al conjunto de datos **FlyWire** (reconstrucción de microscopía electrónica de la Universidad de Princeton) que contiene **395,144 neuronas** y **72,951,370 sinapsis**, cargado en memoria RAM en [`fly_brain.py`](fly_brain.py).
 
 ### Drosophila melanogaster
 - **Definición**: La mosca de la fruta común. Es el organismo modelo más avanzado de la genética y neurociencia moderna debido a que su cerebro, a pesar de ser milimétrico, exhibe memoria asociativa, toma de decisiones probabilísticas, visión en 360° y navegación espacial compleja.
@@ -49,7 +50,7 @@
 ### Neurona LIF (Leaky Integrate-and-Fire)
 - **Definición**: Modelo matemático biofísico que describe cómo una neurona acumula carga eléctrica (voltaje de membrana $V$), experimenta una pérdida pasiva constante hacia el reposo (*leak*), y dispara un potencial de acción (*fire*) cuando supera un umbral crítico $V_{\text{th}}$.
 - **Analogía**: Imagina un cubo con un pequeño agujero en el fondo. El agua que entra son los estímulos sinápticos; el agua que gotea por el agujero es la fuga pasiva ($\alpha = 0.92$). Si el agua llena el cubo hasta el borde ($V_{\text{th}} = 1.0$), el cubo se voltea de golpe (espiga), se vacía a cero ($V_{\text{reset}} = 0.0$) y no puede recibir agua por 2 segundos (periodo refractario).
-- **En Fly-Melee**: Es la ecuación diferencial que se actualiza vectorialmente en [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L990-L1015) para las 395,144 neuronas en menos de **0.12 ms**.
+- **En Fly-Melee**: Es la ecuación diferencial que se actualiza vectorialmente en [`fly_brain.py`](fly_brain.py) para las 395,144 neuronas en menos de **0.12 ms**.
 
 ### Espiga / Potencial de Acción (Spike)
 - **Definición**: Pulso eléctrico todo-o-nada generado por la apertura rápida de canales de sodio dependientes de voltaje en el cono axónico.
@@ -62,7 +63,7 @@
 ### Looming (Expansión Angular de Amenaza)
 - **Definición**: Patrón óptico en el que la silueta de un objeto que se aproxima en trayectoria de colisión directa se expande exponencialmente en el campo visual del ojo compuesto.
 - **Fórmula**: $\frac{d\theta}{dt} = \frac{v_{\text{rel}} \cdot r}{d^2 + r^2}$
-- **En Fly-Melee**: En [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L860-L895), si un oponente como Fox hace un Dash Attack o dispara un proyectil que se aproxima a más de $0.35\text{ unidades/frame}$, la función `stimulate_sensory()` calcula el looming e inyecta hasta $5.0\text{ mA}$ en el Cluster 5 (Giant Fiber), provocando un salto o Wavedash evasivo.
+- **En Fly-Melee**: En [`fly_brain.py`](fly_brain.py), si un oponente como Fox hace un Dash Attack o dispara un proyectil que se aproxima a más de $0.35\text{ unidades/frame}$, la función `stimulate_sensory()` calcula el looming e inyecta hasta $5.0\text{ mA}$ en el Cluster 5 (Giant Fiber), provocando un salto o Wavedash evasivo.
 
 ### Flujo Óptico (Optic Flow)
 - **Definición**: El desplazamiento aparente del fondo y los elementos visuales a través de la retina mientras el animal se mueve por el espacio tridimensional. Permite calcular la velocidad propia sin odometría física.
@@ -82,7 +83,7 @@
 
 ### Evasión Saccádica (Escape Saccade)
 - **Definición**: Un giro o salto balístico involuntario e instantáneo ejecutado por una mosca para escapar de un depredador antes de que su cerebro termine de procesar el ataque completo.
-- **En Fly-Melee**: En [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L3803), ante un ataque rival cercano ($d \le 14.0$), la mosca aborta cualquier plan previo y realiza un Wavedash hacia atrás con microcancel (`⚡ LUIGI GIANT FIBER SACCADE`), dejando al oponente pegando al aire.
+- **En Fly-Melee**: En [`fly_brain.py`](fly_brain.py), ante un ataque rival cercano ($d \le 14.0$), la mosca aborta cualquier plan previo y realiza un Wavedash hacia atrás con microcancel (`⚡ LUIGI GIANT FIBER SACCADE`), dejando al oponente pegando al aire.
 
 ### Dopamina PAM (Protocerebral Anterior Medial)
 - **Definición**: Población de neuronas dopaminérgicas en la mosca que codifican el refuerzo positivo, la búsqueda de recompensa y la motivación ofensiva.
@@ -91,6 +92,14 @@
 ### Octopamina PPL1
 - **Definición**: El equivalente funcional de la adrenalina/noradrenalina en los invertebrados. Regula la respuesta de "lucha o huida", la vigilia extrema y la detección de daño.
 - **En Fly-Melee**: Es la variable `self.octopamine` (0.0 a 1.0). Se dispara cuando el porcentaje de daño es crítico ($> 90\%$) o la mosca cae al abismo, forzando un retorno conservador y uso de escudo.
+
+### Endorfinas y Flow State 20XX
+- **Definición**: Neuropéptidos opioides que amortiguan el dolor y el choque de impacto (analgesia biológica) tras recibir daño severo o hitlag, activando el estado de flujo cognitivo (*Flow State 20XX*).
+- **En Fly-Melee**: Modulado en `self.endorphin` (0.0 a 1.0) en [`fly_brain.py`](fly_brain.py). Evita la parálisis por pánico tras recibir golpes y permite ejecutar contraataques frame-perfect inmediatos.
+
+### Adicción a Ganar 100% (Cero Depresión)
+- **Definición**: Mecanismo neuroendocrino de hiper-resiliencia que erradica la inhibición conductual tras perder stocks o recibir KOs.
+- **En Fly-Melee**: Tras perder un stock, el cerebro rechaza la depresión y entra en *Modo Venganza Depredadora*: fija la Dopamina al $\ge 85\%$, la Octopamina al $100\%$, purga penalizaciones de frames (`penalty_frames = 0`) y desata una persecución ofensiva implacable sin vacilación.
 
 ### STDP (Spike-Timing-Dependent Plasticity)
 - **Definición**: Regla biológica fundamental del aprendizaje: si una neurona presináptica dispara justo antes que la postsináptica, la sinapsis entre ellas se fortalece (potenciación a largo plazo, LTP). Si dispara después, se debilita (depresión a largo plazo, LTD).
@@ -166,6 +175,10 @@ graph LR
 - **Definición**: Estructura de cola circular de memoria donde un hilo productor escribe telemetría y un hilo consumidor la lee mediante índices atómicos (`head` y `tail`), sin usar bloqueos de exclusión mutua (`mutex`).
 - **En Fly-Melee**: El bucle de 60Hz deposita datos de telemetría en el ring buffer sin detenerse. El servidor web `dashboard_server.py` los lee a su propio ritmo. Si el navegador web se congela, Melee no sufre ni un solo microstutter.
 
+### Edge-Triggered Input Pipeline (Controlador por Flanco)
+- **Definición**: Arquitectura de inyección de comandos en la que el controlador virtual detecta y transmite exclusivamente las transiciones de estado de los botones (flancos ascendentes `PRESS` y descendentes `RELEASE`), en lugar de emitir comandos repetitivos continuos en cada cuadro.
+- **En Fly-Melee**: Esencial para el mashing del botón B a 30Hz durante el *Rising Cyclone* de Luigi y para evitar la saturación o desbordamiento de las tuberías IPC hacia Dolphin, garantizando que los inputs de salto y ataque se registren con exactitud de 1 frame sin pérdida de eventos.
+
 ---
 
 # Módulo 3: 🎮 Diccionario Competitivo 20XX de Super Smash Bros. Melee
@@ -224,7 +237,7 @@ graph TD
 ### L-Cancel (Lagless Cancel / Smooth Landing)
 - **Definición**: Presionar los gatillos `L`, `R` o el botón `Z` en una ventana de **7 frames antes de tocar el suelo** mientras se ejecuta un ataque aéreo.
 - **Efecto**: Reduce el tiempo de lag de aterrizaje (*landing lag*) exactamente a la mitad (**50% de reducción**), permitiendo continuar atacando o escudarse antes de que el rival pueda castigar.
-- **En Fly-Melee**: El sistema biológico detecta el descenso inminente y pulsa el gatillo de forma automática en [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L2925-L2932).
+- **En Fly-Melee**: El sistema biológico detecta el descenso inminente y pulsa el gatillo de forma automática en [`fly_brain.py`](fly_brain.py).
 
 ### Out of Shield (OoS)
 - **Definición**: Cualquier acción que interrumpe el estado de escudo inmediatamente sin tener que esperar los 15 frames lentos de soltar el escudo (*shield release lag*).
@@ -238,7 +251,7 @@ graph TD
 ### DI (Directional Influence)
 - **Definición**: Inclinar el stick analógico en un ángulo perpendicular ($\approx 90^\circ$) a la trayectoria en que un golpe te lanza.
 - **Efecto**: No reduce la fuerza del golpe, pero altera la trayectoria de salida (por ejemplo, convirtiendo una trayectoria horizontal letal hacia el abismo en una trayectoria diagonal hacia la esquina superior del escenario), permitiendo sobrevivir a golpes devastadores.
-- **En Fly-Melee**: Implementado en el filtro de supervivencia hacia el centro del escenario en [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L2634-L2648).
+- **En Fly-Melee**: Implementado en el filtro de supervivencia hacia el centro del escenario en [`fly_brain.py`](fly_brain.py).
 
 ### SDI (Smash Directional Influence)
 - **Definición**: Mover violentamente el stick analógico durante los breves fotogramas de congelamiento de un golpe (*hitlag*).
@@ -295,7 +308,7 @@ graph TD
 
 ### Chaingrab
 - **Definición**: Agarrar repetidamente a un rival, lanzarlo con Down-Throw o Up-Throw, y volverlo a agarrar antes de que pueda tocar el suelo o reaccionar.
-- **En Luigi**: En [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L3095-L3125), ejecuta la cadena clásica contra personajes pesados (*Fastfallers* como Fox o Falco) hasta rematarlos con Shoryuken.
+- **En Luigi**: En [`fly_brain.py`](fly_brain.py), ejecuta la cadena clásica contra personajes pesados (*Fastfallers* como Fox o Falco) hasta rematarlos con Shoryuken.
 
 ### Ledge-Stall / Haxdash
 - **Definición**: Soltar la repisa (*ledge drop*) y saltar de regreso de inmediato para reconectarse a ella.
@@ -332,6 +345,16 @@ graph TD
 - **Definición**: La acción de girar frenéticamente el stick analógico y pulsar todos los botones a máxima velocidad:
   - Para liberarse de un agarre rival antes de tiempo (Mash-Out a 60 inputs/s en el **Test 73**).
   - Para elevar el *Luigi Cyclone* por los aires como un helicóptero de recuperación.
+
+### FFA (Free-For-All) & Target Selection IQ
+- **Definición**: Modalidad competitiva de todos contra todos con hasta 4 jugadores simultáneos. Exige algoritmos de selección dinámica de amenazas que evalúen en tiempo real a todos los adversarios.
+- **En Fly-Melee**: Implementado en `select_best_target()` en [`fly_brain.py`](fly_brain.py). Pondera la proximidad espacial, porcentaje de daño y vulnerabilidad en tumble/hitstun de cada contrincante activo, vetando la fijación en enemigos invulnerables sobre el halo de respawn (`REBIRTH_WAIT`) o eliminados.
+
+### Anti-Pinch Crowd Control
+- **Definición**: Táctica biomecánica para romper situaciones donde dos o más oponentes flanquean a un jugador desde lados opuestos simultáneamente ("ataque en pinza" o sándwich).
+- **En Fly-Melee**: Cuando [`fly_brain.py`](fly_brain.py) detecta amenazas a ambos flancos a distancias críticas, aborta ataques unidireccionales y activa respuestas omnidireccionales de 360° inmediatas:
+  - **Luigi**: `Rising Cyclone 360°` (vórtice que absorbe y eleva a los atacantes) o `Down-Smash Semi-Spike` bilateral.
+  - **Fox**: `Reflector Shine 360° Frame-1` para repeler a ambos contrincantes en el primer cuadro activo.
 
 ---
 
@@ -381,14 +404,67 @@ graph TD
 ### ioctl
 - **Definición**: Llamada al sistema de Linux (*Input/Output Control*) utilizada para enviar comandos y consultar parámetros de bajo nivel de controladores de dispositivos que no pueden expresarse con operaciones estándar de lectura o escritura de archivos. Utilizado por `evdev` para consultar la tasa de muestreo de mandos GameCube.
 
+### Capa de Compatibilidad Multiplataforma (Linux & Windows)
+- **Definición**: Subsistema de detección de entorno operativo (`platform.system()`) que activa las rutas de IPC, control de archivos y controladores correspondientes:
+  - **Linux**: Nodos `/dev/input/event*` vía `evdev`, Named Pipes `/tmp/dolphin-emu/`, auto-descarga de Slippi AppImage y `os.pwrite()`.
+  - **Windows**: Rutas `%APPDATA%\Slippi Launcher\netplay\` y `User/`, auto-aprovisionamiento y descarga de **Slippi Dolphin (Ishiiruka v3.6.4, ~11.6 MB)** y su archivo `Settings` JSON para `libmelee`, I/O multihilo `r+b` con exclusión mutua (`file_lock`), detección de procesos mediante `psutil` y soporte de mandos mediante `pygame`, `XInput` y `WinMM`.
+  - **macOS**: Excluido de forma estricta arrojando `OSError` por limitaciones en el subsistema de temporización y emulación determinista a 60 FPS.
+
+### psutil
+- **Definición**: Biblioteca multiplataforma para recuperación de información sobre procesos y utilización del sistema en Python.
+- **En Fly-Melee**: Utilizada en `fly_melee.py` y `detect_controller.py` para iterar y verificar de forma no bloqueante si `Dolphin.exe` o `Slippi Dolphin.exe` están activos en memoria en entornos Windows.
+
+### Pygame
+- **Definición**: Conjunto de módulos multimedia en Python diseñado para escribir videojuegos e interactuar con hardware de entrada.
+- **En Fly-Melee**: Inicializa el subsistema `pygame.joystick` en Windows para detectar gamepads conectados (GameCube, Xbox, PlayStation) y permitir pruebas interactivas de botones y ejes.
+
+### XInput / DirectInput (WinMM)
+- **Definición**: APIs nativas de Microsoft Windows para captura de mandos:
+  - *XInput*: API moderna para mandos tipo Xbox 360 / One / Series (`xinput1_4.dll`).
+  - *DirectInput (WinMM)*: API clásica para mandos genéricos USB y adaptadores mediante `winmm.joyGetPosEx`.
+- **En Fly-Melee**: Cargadas dinámicamente mediante `ctypes` en `detect_controller.py` para leer botones y sticks con latencia mínima y configurar automáticamente `GCPadNew.ini`.
+
+### Scripts de Arranque Multiplataforma (`start_fly.sh` / `start_fly.ps1`)
+- **Definición**: Scripts de orquestación de alto nivel diseñados para automatizar por completo el arranque del entorno Fly-Melee tanto en Linux (`.sh`) como en Windows PowerShell (`.ps1`).
+- **En Fly-Melee**:
+  - Detectan automáticamente el ejecutable de Python en el entorno virtual (`.venv/bin/python` o `.venv\Scripts\python.exe`).
+  - Verifican y levantan en segundo plano el servidor web de telemetría 3D ([`dashboard_server.py`](dashboard_server.py)) y abren el navegador en `http://localhost:8085`.
+  - Presentan un menú interactivo con temporizador de 5 segundos para arrancar combates (Humano vs Luigi/Fox, Espectador vs CPU 9 o Modo Ultra-Fluido 60 FPS).
+  - En Windows (`start_fly.ps1`), están codificados en **UTF-8 con BOM (`utf-8-sig`)** para ejecución nativa en PowerShell 5.1/7+, capturan excepciones ante terminales no interactivas (`[Console]::KeyAvailable`), e inyectan `$env:PYTHONIOENCODING="utf-8"` y `$env:PYTHONUTF8="1"` para evitar fallos de codificación de emojis en la consola.
+  - Mantienen un bucle de ejecución continuo permitiendo reiniciar partidas sin cerrar la consola.
+
+### `start_dolphin` (`.sh` / `.ps1`)
+- **Definición**: Centro de control y panel de utilidades por terminal para Dolphin y Fly-Melee.
+- **En Fly-Melee**: Permite seleccionar partidas contra humanos o CPUs, ejecutar suites masivas de entrenamiento biológico ([`train_fly.py`](train_fly.py)), correr pruebas de actividad neural en consola ([`test_fly_brain.py`](test_fly_brain.py)) y descargar la ISO oficial de forma acelerada ([`fast_download.py`](fast_download.py)). En Windows cuenta con saneamiento automático de comillas en rutas ingresadas por el usuario.
+
+### `fix_bluetooth_gamepad` (`.sh` / `.ps1`)
+- **Definición**: Asistente de diagnóstico y corrección de conectividad para mandos de juego USB y Bluetooth.
+- **En Linux (`fix_bluetooth_gamepad.sh`)**: Edita `/etc/bluetooth/input.conf` configurando `ClassicBondedOnly=false` para habilitar gamepads genéricos en el daemon BlueZ.
+- **En Windows (`fix_bluetooth_gamepad.ps1`)**: Abre el panel de dispositivos de juego `joy.cpl`, la interfaz de configuración de Bluetooth (`ms-settings:bluetooth`), supervisa el servicio `bthserv` y ejecuta [`detect_controller.py`](detect_controller.py) para autoconfigurar XInput o DirectInput en Dolphin. Codificado en UTF-8 con BOM para PowerShell.
+
+### `fast_download.py`
+- **Definición**: Utilidad de verificación preventiva y descarga multihilo acelerada para la ROM/ISO de Nintendo GameCube de *Super Smash Bros. Melee* v1.02 NTSC (`data/games/ssbm.iso`).
+- **En Fly-Melee**:
+  - Comprueba preventivamente si `data/games/ssbm.iso` ya existe y tiene el tamaño íntegro exacto (1,459,978,240 bytes); si es válida, finaliza de inmediato (<0.02s) sin descargas redundantes.
+  - Si el archivo no existe o está incompleto, crea automáticamente el directorio `data/games/` y descarga la imagen particionándola en 16 hilos simultáneos mediante solicitudes HTTP con cabecera `Range: bytes`.
+  - En Linux utiliza llamadas directas a descriptores de archivo POSIX con `os.pwrite()`; en Windows implementa I/O binario `r+b` sincronizado con exclusión mutua (`threading.Lock`).
+  - Escribe en un archivo temporal intermedio `.part` y ejecuta un reemplazo atómico (`os.replace`) al alcanzar el 100%, garantizando que Dolphin nunca intente arrancar una imagen truncada por cortes de conexión o cancelaciones de usuario.
+  - Es ejecutado automáticamente por [`start_fly.sh`](start_fly.sh) y [`start_fly.ps1`](start_fly.ps1) previo al encendido del emulador.
+
 ---
 
 # Módulo 5: 🔬 Arquitectura Interna de Fly-Melee
 
 ### Runway Barrier (Barrera de Pista)
-- **Definición**: Algoritmo geométrico fail-safe en [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L1040-L1080) que calcula la distancia euclidiana entre la posición $p_x$ de la mosca y el borde del escenario:
+- **Definición**: Algoritmo geométrico fail-safe en [`fly_brain.py`](fly_brain.py) que calcula la distancia euclidiana entre la posición $p_x$ de la mosca y el borde del escenario:
   $$\text{runway} = \text{borde\_escenario} - |p_x|$$
-- **Comportamiento**: Si la mosca está en carrera hacia el borde y $\text{runway} \le 14.0\text{ u}$, la barrera veta el stick analógico hacia el abismo, forzando un Crouch-Cancel que frena a Luigi o Fox antes de que caigan.
+- **Comportamiento**:
+  1. Si la mosca está en carrera hacia el borde y $\text{runway} \le 14.0\text{ u}$, la barrera neutraliza el stick ($X \leftarrow 0.5$) y fuerza agacharse ($Y \leftarrow 0.0$), ejecutando un Crouch Cancel que detiene a Luigi o Fox antes de que caigan.
+  2. Para Wavedashes terrestres de Luigi (fricción $0.005$), exige una pista mínima de **45 unidades** en la dirección del movimiento; si el espacio es inferior, cancela el deslizamiento al abismo.
+
+### Descenso Protegido de Halo Platform
+- **Definición**: Protocolo de bajada vertical durante la invulnerabilidad post-respawn.
+- **En Fly-Melee**: Fuerza el stick analógico estrictamente a $(X = 0.5, Y = 0.0)$, cayendo verticalmente al centro seguro del escenario y neutralizando airdodges diagonales accidentales hacia el abismo.
 
 ### Cluster Spike Modulation (Modulación por Espigas de Clusters)
 - **Definición**: Mecanismo biofísico donde la tasa de disparo acumulada de clusters anatómicos específicos modula las decisiones motoras en Melee.
@@ -407,6 +483,6 @@ graph TD
 
 ## 📚 Enlaces Rápidos a la Documentación del Repositorio
 
-- [**README.md**](file:///home/ltar/projects/fly-melee/README.md): Guía rápida de instalación, inicio con Dolphin y controles de juego.
-- [**README_TECNICO.md**](file:///home/ltar/projects/fly-melee/README_TECNICO.md): Documento de ingeniería profunda con ecuaciones diferenciales LIF, álgebra CSC, benchmarks y los 8 clusters biológicos.
-- [**verify_fixes.py**](file:///home/ltar/projects/fly-melee/verify_fixes.py): Batería completa de 81 pruebas unitarias y de integración continua.
+- [**README.md**](README.md): Guía rápida de instalación, inicio con Dolphin y controles de juego.
+- [**README_TECNICO.md**](README_TECNICO.md): Documento de ingeniería profunda con ecuaciones diferenciales LIF, álgebra CSC, benchmarks y los 8 clusters biológicos.
+- [**verify_fixes.py**](verify_fixes.py): Batería completa de 103 pruebas unitarias y de integración continua.

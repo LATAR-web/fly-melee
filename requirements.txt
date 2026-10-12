@@ -13,7 +13,14 @@ pyenet-vladfi>=1.3.19
 py-ubjson>=0.16.1
 
 # Detección y calibración de mandos (GameCube, Xbox, PlayStation, Bluetooth) en Linux
-evdev>=1.6.0
+evdev>=1.6.0; sys_platform == 'linux'
 
 # Opcional: PyTorch para aceleración matricial o entrenamiento profundo
 # torch>=2.0.0
+
+# ==============================================================================
+# Dependencias para compatibilidad con Windows (Detección de procesos y mandos)
+# ==============================================================================
+psutil>=5.9.0
+pygame>=2.5.0
+

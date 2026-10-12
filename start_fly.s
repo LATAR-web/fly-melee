@@ -1,1 +1,1 @@
-/home/ltar/projects/fly-melee/start_fly.sh
+start_fly.sh

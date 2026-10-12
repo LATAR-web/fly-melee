@@ -14,14 +14,31 @@ Suite de Entrenamiento de Élite 20XX:
 """
 import sys
 import os
+import platform
+
+# ==============================================================================
+# Comprobación de Sistema Operativo (Linux o Windows - No incluye Mac)
+# ==============================================================================
+CURRENT_OS = platform.system()
+if CURRENT_OS == "Linux":
+    IS_LINUX = True
+    IS_WINDOWS = False
+elif CURRENT_OS == "Windows":
+    IS_LINUX = False
+    IS_WINDOWS = True
+else:
+    raise OSError(f"Sistema operativo no soportado: '{CURRENT_OS}'. Solo se admite Linux o Windows.")
 
 try:
     import numpy as np
 except ImportError:
-    for venv_python in [
+    candidates = [
         os.path.join(os.path.dirname(__file__), ".venv", "bin", "python"),
         "/home/ltar/.venvs/pytorch/bin/python",
-    ]:
+    ]
+    if IS_WINDOWS:
+        candidates.insert(0, os.path.join(os.path.dirname(__file__), ".venv", "Scripts", "python.exe"))
+    for venv_python in candidates:
         if os.path.exists(venv_python) and sys.executable != venv_python:
             script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
             os.execv(venv_python, [venv_python, script] + sys.argv[1:])
