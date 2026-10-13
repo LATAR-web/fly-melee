@@ -7,15 +7,39 @@ Fly Melee Bridge - Mosca (P1 - Luigi/Fox) vs Jugador Humano (P2 - Tú)
 """
 import sys
 import os
+import platform
+
+# ==============================================================================
+# Comprobación de Sistema Operativo (Linux o Windows - No incluye Mac)
+# ==============================================================================
+CURRENT_OS = platform.system()
+if CURRENT_OS == "Linux":
+    IS_LINUX = True
+    IS_WINDOWS = False
+elif CURRENT_OS == "Windows":
+    IS_LINUX = False
+    IS_WINDOWS = True
+else:
+    raise OSError(f"Sistema operativo no soportado: '{CURRENT_OS}'. Solo se admite Linux o Windows.")
 
 try:
     import numpy as np
     import melee
 except ImportError:
-    venv_python = "/home/ltar/.venvs/pytorch/bin/python"
-    if os.path.exists(venv_python) and sys.executable != venv_python:
-        script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
-        os.execv(venv_python, [venv_python, script] + sys.argv[1:])
+    if IS_LINUX:
+        venv_candidates = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python"),
+            "/home/ltar/.venvs/pytorch/bin/python",
+        ]
+        for venv_python in venv_candidates:
+            if os.path.exists(venv_python) and sys.executable != venv_python:
+                script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+                os.execv(venv_python, [venv_python, script] + sys.argv[1:])
+    elif IS_WINDOWS:
+        venv_win = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "Scripts", "python.exe")
+        if os.path.exists(venv_win) and sys.executable.lower() != venv_win.lower():
+            script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+            os.execv(venv_win, [venv_win] + sys.argv[1:])
     raise
 
 import time
@@ -30,8 +54,28 @@ import http.client
 import urllib.request
 from fly_brain import FlyBrain
 
+def get_dolphin_home_windows():
+    """Localiza el directorio base de Dolphin / Slippi en Windows."""
+    appdata = os.environ.get("APPDATA")
+    candidates = []
+    if appdata:
+        candidates.append(os.path.join(appdata, "Slippi Launcher", "netplay", "User"))
+        candidates.append(os.path.join(appdata, "SlippiOnline"))
+        candidates.append(os.path.join(appdata, "Slippi Launcher", "netplay"))
+        candidates.append(os.path.join(appdata, "Dolphin Emulator"))
+    userprofile = os.environ.get("USERPROFILE")
+    if userprofile:
+        candidates.append(os.path.join(userprofile, "Documents", "Dolphin Emulator"))
+        candidates.append(os.path.join(userprofile, "Documents", "Slippi"))
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    if appdata:
+        return os.path.join(appdata, "SlippiOnline")
+    return os.path.expanduser(r"~\AppData\Roaming\SlippiOnline")
+
 DEFAULT_ISO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "games", "ssbm.iso")
-DOLPHIN_HOME = os.path.expanduser("~/.config/SlippiOnline")
+DOLPHIN_HOME = get_dolphin_home_windows() if IS_WINDOWS else os.path.expanduser("~/.config/SlippiOnline")
 DASHBOARD_URL = "http://127.0.0.1:8085/api/push_state"
 
 class TelemetryClient:
@@ -83,8 +127,8 @@ class TelemetryClient:
     def close(self):
         self.running = False
 
-def setup_human_and_bot_controllers(home_path, cpu_mode=False):
-    """Configura Dolphin para que el Puerto 1 sea la Mosca y el Puerto 2 sea el Jugador Humano o Bot CPU."""
+def setup_human_and_bot_controllers_linux(home_path, cpu_mode=False):
+    """Configura Dolphin para que el Puerto 1 sea la Mosca y el Puerto 2 sea el Jugador Humano o Bot CPU (Linux)."""
     config_dir = os.path.join(home_path, "Config")
     os.makedirs(config_dir, exist_ok=True)
     os.makedirs(os.path.join(home_path, "Pipes"), exist_ok=True)
@@ -199,12 +243,316 @@ def setup_human_and_bot_controllers(home_path, cpu_mode=False):
         with open(g_ini_path, "w") as f:
             g_cfg.write(f)
 
-def is_dolphin_running():
+def setup_human_and_bot_controllers_windows(home_path, cpu_mode=False):
+    """Configura Dolphin para que el Puerto 1 sea la Mosca y el Puerto 2 sea el Jugador Humano o Bot CPU (Windows)."""
+    config_dir = os.path.join(home_path, "Config")
+    os.makedirs(config_dir, exist_ok=True)
+    os.makedirs(os.path.join(home_path, "Pipes"), exist_ok=True)
+
+    dolphin_ini_path = os.path.join(config_dir, "Dolphin.ini")
+    d_cfg = configparser.ConfigParser()
+    if os.path.exists(dolphin_ini_path):
+        d_cfg.read(dolphin_ini_path)
+    if not d_cfg.has_section("Core"):
+        d_cfg.add_section("Core")
+    d_cfg.set("Core", "SIDevice0", "6")  # Port 1: Bot (Pipe)
+    d_cfg.set("Core", "SIDevice1", "0" if cpu_mode else "6")  # Port 2: CPU o Humano
+    d_cfg.set("Core", "SIDevice2", "0")
+    d_cfg.set("Core", "SIDevice3", "0")
+
+    if not d_cfg.has_section("Display"):
+        d_cfg.add_section("Display")
+    d_cfg.set("Display", "Fullscreen", "False")
+    d_cfg.set("Display", "RenderToMain", "False")
+    d_cfg.set("Display", "RenderWindowWidth", "960")
+    d_cfg.set("Display", "RenderWindowHeight", "720")
+
+    if not d_cfg.has_section("Input"):
+        d_cfg.add_section("Input")
+    d_cfg.set("Input", "BackgroundInput", "True")
+
+    with open(dolphin_ini_path, "w") as f:
+        d_cfg.write(f)
+
+    g_ini_path = os.path.join(config_dir, "GCPadNew.ini")
+    g_cfg = configparser.ConfigParser()
+    if os.path.exists(g_ini_path):
+        g_cfg.read(g_ini_path)
+
+    # Puerto 1: Pipe para la mosca
+    if not g_cfg.has_section("GCPad1"):
+        g_cfg.add_section("GCPad1")
+    g_cfg.set("GCPad1", "Device", "Pipe/0/slippibot1")
+    g_cfg.set("GCPad1", "Buttons/A", "Button A")
+    g_cfg.set("GCPad1", "Buttons/B", "Button B")
+    g_cfg.set("GCPad1", "Buttons/X", "Button X")
+    g_cfg.set("GCPad1", "Buttons/Y", "Button Y")
+    g_cfg.set("GCPad1", "Buttons/Z", "Button Z")
+    g_cfg.set("GCPad1", "Buttons/L", "Button L")
+    g_cfg.set("GCPad1", "Buttons/R", "Button R")
+    g_cfg.set("GCPad1", "Buttons/Start", "Button START")
+    g_cfg.set("GCPad1", "Main Stick/Up", "Axis MAIN Y +")
+    g_cfg.set("GCPad1", "Main Stick/Down", "Axis MAIN Y -")
+    g_cfg.set("GCPad1", "Main Stick/Left", "Axis MAIN X -")
+    g_cfg.set("GCPad1", "Main Stick/Right", "Axis MAIN X +")
+    g_cfg.set("GCPad1", "C-Stick/Up", "Axis C Y +")
+    g_cfg.set("GCPad1", "C-Stick/Down", "Axis C Y -")
+    g_cfg.set("GCPad1", "C-Stick/Left", "Axis C X -")
+    g_cfg.set("GCPad1", "C-Stick/Right", "Axis C X +")
+    g_cfg.set("GCPad1", "Triggers/L", "Button L")
+    g_cfg.set("GCPad1", "Triggers/R", "Button R")
+    g_cfg.set("GCPad1", "Triggers/Threshold", "90")
+    g_cfg.set("GCPad1", "Main Stick/Radius", "100")
+    g_cfg.set("GCPad1", "C-Stick/Radius", "100")
+
+    # Puerto 2: Detectar mando o configurar Teclado en Windows
+    windows_gamepad = None
+    try:
+        from detect_controller import get_windows_gamepads
+        gps = get_windows_gamepads()
+        if gps:
+            windows_gamepad = gps[0]
+    except Exception:
+        pass
+
+    if windows_gamepad:
+        print(f"🎮 ¡Mando detectado automáticamente para P2 en Windows: '{windows_gamepad['name']}' ({windows_gamepad['device_str']})!")
+        from detect_controller import configure_dolphin_for_gamepad_windows
+        configure_dolphin_for_gamepad_windows(windows_gamepad)
+    else:
+        if not g_cfg.has_section("GCPad2"):
+            g_cfg.add_section("GCPad2")
+        g_cfg.set("GCPad2", "Device", "DInput/0/Keyboard Mouse")
+        g_cfg.set("GCPad2", "Buttons/A", "`J` | `X` | `SPACE` | `Space`")
+        g_cfg.set("GCPad2", "Buttons/B", "`K` | `Z`")
+        g_cfg.set("GCPad2", "Buttons/X", "`U` | `C`")
+        g_cfg.set("GCPad2", "Buttons/Y", "`I` | `V`")
+        g_cfg.set("GCPad2", "Buttons/Z", "`O` | `F`")
+        g_cfg.set("GCPad2", "Buttons/Start", "`RETURN` | `Return` | `Enter`")
+        g_cfg.set("GCPad2", "Main Stick/Up", "`UP` | `Up` | `W`")
+        g_cfg.set("GCPad2", "Main Stick/Down", "`DOWN` | `Down` | `S`")
+        g_cfg.set("GCPad2", "Main Stick/Left", "`LEFT` | `Left` | `A`")
+        g_cfg.set("GCPad2", "Main Stick/Right", "`RIGHT` | `Right` | `D`")
+        g_cfg.set("GCPad2", "Main Stick/Modifier", "`LSHIFT` | `RSHIFT` | `Shift`")
+        g_cfg.set("GCPad2", "Main Stick/Calibration", "100.00 141.42 100.00 141.42 100.00 141.42 100.00 141.42")
+        g_cfg.set("GCPad2", "Main Stick/Radius", "100")
+        g_cfg.set("GCPad2", "C-Stick/Up", "`NUMPAD8` | `Home` | `KP_8`")
+        g_cfg.set("GCPad2", "C-Stick/Down", "`NUMPAD2` | `End` | `KP_2`")
+        g_cfg.set("GCPad2", "C-Stick/Left", "`NUMPAD4` | `Delete` | `KP_4`")
+        g_cfg.set("GCPad2", "C-Stick/Right", "`NUMPAD6` | `Page_Down` | `KP_6`")
+        g_cfg.set("GCPad2", "C-Stick/Radius", "100")
+        g_cfg.set("GCPad2", "Triggers/L", "`L` | `Q`")
+        g_cfg.set("GCPad2", "Triggers/R", "`P` | `E`")
+        g_cfg.set("GCPad2", "Triggers/Threshold", "50")
+        g_cfg.set("GCPad2", "D-Pad/Up", "`NUMPAD8` | `1`")
+        g_cfg.set("GCPad2", "D-Pad/Down", "`NUMPAD2` | `2`")
+        g_cfg.set("GCPad2", "D-Pad/Left", "`NUMPAD4` | `3`")
+        g_cfg.set("GCPad2", "D-Pad/Right", "`NUMPAD6` | `4`")
+
+        with open(g_ini_path, "w") as f:
+            g_cfg.write(f)
+
+def setup_human_and_bot_controllers(home_path, cpu_mode=False):
+    if IS_WINDOWS:
+        return setup_human_and_bot_controllers_windows(home_path, cpu_mode=cpu_mode)
+    return setup_human_and_bot_controllers_linux(home_path, cpu_mode=cpu_mode)
+
+def resolve_dolphin_path_windows():
+    """Busca el directorio que contiene el ejecutable de Dolphin / Slippi en Windows para libmelee."""
+    appdata = os.environ.get("APPDATA", "")
+    localappdata = os.environ.get("LOCALAPPDATA", "")
+    candidates = [
+        os.path.join(appdata, "Slippi Launcher", "netplay"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "dolphin"),
+        os.path.join(appdata, "Slippi Launcher", "netplay-beta"),
+        os.path.join(appdata, "SlippiOnline"),
+        os.path.join(localappdata, "Programs", "Slippi Launcher"),
+    ]
+    for d in candidates:
+        if os.path.isdir(d):
+            for exe in ["Slippi Dolphin.exe", "Slippi_Dolphin.exe", "Dolphin.exe"]:
+                if os.path.exists(os.path.join(d, exe)):
+                    return d
+    return None
+
+def is_dolphin_running_linux():
     try:
         out = subprocess.check_output(["pgrep", "-f", "Slippi_Online|dolphin-emu"]).decode()
         return bool(out.strip())
     except Exception:
         return False
+
+def is_dolphin_running_windows():
+    try:
+        import psutil
+        for proc in psutil.process_iter(['name']):
+            pname = (proc.info.get('name') or '').lower()
+            if any(target in pname for target in ['dolphin', 'slippi']):
+                return True
+    except Exception:
+        pass
+    try:
+        out = subprocess.check_output(["tasklist"], stderr=subprocess.DEVNULL).decode("utf-8", errors="ignore").lower()
+        return ("dolphin" in out) or ("slippi" in out)
+    except Exception:
+        return False
+
+def is_dolphin_running():
+    if IS_WINDOWS:
+        return is_dolphin_running_windows()
+    return is_dolphin_running_linux()
+
+def ensure_slippi_launcher_config():
+    """Crea la estructura mínima de configuración de Slippi Launcher que libmelee requiere.
+    
+    libmelee llama a default_dolphin_info() cuando no se le pasa un path al ejecutable de Dolphin.
+    Esa función intenta leer Settings y falla con FileNotFoundError si Slippi Launcher no está instalado.
+    Esta función crea la configuración mínima y descarga Slippi Dolphin si es necesario.
+    """
+    if IS_WINDOWS:
+        appdata = os.environ.get("APPDATA", os.path.expanduser(r"~\AppData\Roaming"))
+        slippi_dir = os.path.join(appdata, "Slippi Launcher")
+        settings_path = os.path.join(slippi_dir, "Settings")
+        netplay_dir = os.path.join(slippi_dir, "netplay")
+        exe_path = os.path.join(netplay_dir, "Slippi Dolphin.exe")
+        user_dir = os.path.join(netplay_dir, "User")
+
+        needs_settings = not os.path.exists(settings_path)
+        needs_exe = not os.path.exists(exe_path)
+
+        if not needs_settings and not needs_exe:
+            return
+
+        print("🔧 [Setup] Configurando Slippi Dolphin para Windows...")
+        os.makedirs(slippi_dir, exist_ok=True)
+        os.makedirs(netplay_dir, exist_ok=True)
+        os.makedirs(user_dir, exist_ok=True)
+
+        if needs_settings:
+            iso_candidate = DEFAULT_ISO if os.path.exists(DEFAULT_ISO) else None
+            settings = {
+                "settings": {
+                    "useNetplayBeta": False,
+                    "isoPath": iso_candidate,
+                }
+            }
+            with open(settings_path, "w") as f:
+                json.dump(settings, f, indent=2)
+            print(f"✅ [Setup] Configuración creada en: {settings_path}")
+
+        if needs_exe:
+            SLIPPI_WIN_URL = "https://github.com/project-slippi/Ishiiruka/releases/download/v3.6.4/FM-Slippi-3.6.4-Win.zip"
+            print("📥 [Setup] Descargando Slippi Dolphin para Windows (Ishiiruka v3.6.4, ~11.6 MB)...")
+            print(f"   URL: {SLIPPI_WIN_URL}")
+            print(f"   Destino: {netplay_dir}")
+            try:
+                import io, zipfile
+                req = urllib.request.Request(SLIPPI_WIN_URL, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    zip_bytes = resp.read()
+                with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                    zf.extractall(netplay_dir)
+                print(f"✅ [Setup] Slippi Dolphin descargado y descomprimido con éxito en: {netplay_dir}")
+            except Exception as e:
+                print(f"\n❌ [Setup] Error descargando Slippi Dolphin en Windows: {e}")
+                print("   Descarga Slippi Launcher manualmente desde: https://slippi.gg/")
+                raise SystemExit(1)
+        return
+    
+    home = os.path.expanduser("~")
+    slippi_dir = os.path.join(home, ".config", "Slippi Launcher")
+    settings_path = os.path.join(slippi_dir, "Settings")
+    netplay_dir = os.path.join(slippi_dir, "netplay")
+    appimage_path = os.path.join(netplay_dir, "Slippi_Online-x86_64.AppImage")
+    
+    needs_settings = not os.path.exists(settings_path)
+    needs_appimage = not os.path.exists(appimage_path)
+    
+    if not needs_settings and not needs_appimage:
+        return  # Todo en orden, no tocar nada
+    
+    print("🔧 [Setup] Configurando Slippi Dolphin para libmelee...")
+    os.makedirs(slippi_dir, exist_ok=True)
+    os.makedirs(netplay_dir, exist_ok=True)
+    
+    # Crear archivo Settings mínimo que default_dolphin_info() necesita leer
+    if needs_settings:
+        settings = {
+            "settings": {
+                "useNetplayBeta": False,
+                "isoPath": DEFAULT_ISO if os.path.exists(DEFAULT_ISO) else None,
+            }
+        }
+        with open(settings_path, "w") as f:
+            json.dump(settings, f, indent=2)
+        print(f"✅ [Setup] Configuración creada en: {settings_path}")
+    
+    # Crear directorio home de SlippiOnline que fly_melee usa como DOLPHIN_HOME
+    slippi_home = os.path.join(home, ".config", "SlippiOnline")
+    os.makedirs(slippi_home, exist_ok=True)
+    
+    # Descargar Slippi Dolphin AppImage si no existe
+    if needs_appimage:
+        SLIPPI_DOLPHIN_URL = "https://github.com/project-slippi/Ishiiruka/releases/download/v3.6.4/Slippi_Online-x86_64.AppImage"
+        print(f"📥 [Setup] Descargando Slippi Dolphin (Ishiiruka v3.6.4)...")
+        print(f"   URL: {SLIPPI_DOLPHIN_URL}")
+        print(f"   Destino: {appimage_path}")
+        try:
+            req = urllib.request.Request(SLIPPI_DOLPHIN_URL, headers={
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)'
+            })
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                total = int(resp.headers.get('Content-Length', 0))
+                downloaded = 0
+                with open(appimage_path, 'wb') as f:
+                    while True:
+                        chunk = resp.read(256 * 1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            pct = (downloaded / total) * 100
+                            sys.stdout.write(f"\r   📥 Progreso: {pct:.0f}% ({downloaded // (1024*1024)}MB / {total // (1024*1024)}MB)")
+                            sys.stdout.flush()
+            print()
+            os.chmod(appimage_path, 0o755)
+            print(f"✅ [Setup] Slippi Dolphin descargado y listo: {appimage_path}")
+        except Exception as e:
+            print(f"\n❌ [Setup] Error descargando Slippi Dolphin: {e}")
+            print(f"   Descárgalo manualmente desde:")
+            print(f"   https://github.com/project-slippi/Ishiiruka/releases/latest")
+            print(f"   Y colócalo en: {appimage_path}")
+            if os.path.exists(appimage_path):
+                os.remove(appimage_path)
+            raise SystemExit(1)
+
+def resolve_dolphin_path_linux():
+    """Busca el ejecutable de Dolphin / Slippi en Linux en múltiples ubicaciones."""
+    home = os.path.expanduser("~")
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    candidates = [
+        # 1. AppRun local del proyecto
+        os.path.join(project_dir, "dolphin", "AppRun"),
+        # 2. Slippi Launcher netplay (no-mainline)
+        os.path.join(home, ".config", "Slippi Launcher", "netplay", "Slippi_Online-x86_64.AppImage"),
+        # 3. Slippi Launcher netplay-beta (mainline)
+        os.path.join(home, ".config", "Slippi Launcher", "netplay-beta", "Slippi_Netplay_Mainline-x86_64.AppImage"),
+        # 4. AppImage sueltos en el proyecto
+        os.path.join(project_dir, "Slippi_Online-x86_64.AppImage"),
+        os.path.join(project_dir, "dolphin", "Slippi_Online-x86_64.AppImage"),
+        # 5. Binario estándar de Dolphin del sistema
+        "/usr/bin/dolphin-emu",
+        "/usr/local/bin/dolphin-emu",
+        # 6. Flatpak
+        os.path.join(home, ".local", "share", "flatpak", "exports", "bin", "org.DolphinEmu.dolphin-emu"),
+    ]
+    
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
 
 def select_character_fly(gamestate, controller, cpu_mode=False, target_char_name="LUIGI"):
     """
@@ -371,9 +719,19 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
     # 2. Inicializar consola de Dolphin usando DOLPHIN_HOME
     print("\n⏳ Inicializando consola Dolphin...")
     if not dolphin_path:
-        local_apprun = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dolphin", "AppRun")
-        if os.path.exists(local_apprun):
-            dolphin_path = local_apprun
+        if IS_WINDOWS:
+            dolphin_path = resolve_dolphin_path_windows()
+            if not dolphin_path:
+                ensure_slippi_launcher_config()
+                dolphin_path = resolve_dolphin_path_windows()
+        else:
+            # Primero intentar encontrar Dolphin/Slippi ya instalado
+            dolphin_path = resolve_dolphin_path_linux()
+            # Si no se encuentra, provisionar configuración y descargar Slippi Dolphin
+            if not dolphin_path:
+                ensure_slippi_launcher_config()
+                # Re-buscar ahora que el AppImage puede haber sido descargado
+                dolphin_path = resolve_dolphin_path_linux()
 
     console = melee.Console(
         path=dolphin_path,
@@ -397,19 +755,35 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
     if not is_dolphin_running() and iso_path:
         print(f"🚀 Iniciando emulador Dolphin con {iso_path}...")
         console.run(iso_path=iso_path)
-    else:
+    elif is_dolphin_running():
         print("🔗 Conectando a instancia de Dolphin en ejecución...")
+    else:
+        print("❌ Error: No hay ninguna instancia de Dolphin en ejecución y no se encontró la ISO del juego.")
+        print("   Coloca la ISO de Super Smash Bros. Melee en: data/games/ssbm.iso")
+        sys.exit(1)
         
     print("⏳ Esperando conexión a Dolphin...")
     connected = False
     for attempt in range(1, 25):
-        if console.connect():
-            connected = True
-            break
-        time.sleep(1)
+        try:
+            if console.connect():
+                connected = True
+                break
+        except AttributeError:
+            # Después de un connect() fallido, libmelee destruye el worker interno
+            # (SlippstreamClient._worker = None). Hay que recrear el SlippstreamClient
+            # para poder reintentar la conexión.
+            pass
+        print(f"   Reintento {attempt}/24...")
+        time.sleep(2)
+        # Recrear el SlippstreamClient interno para el siguiente intento,
+        # ya que el anterior quedó inutilizado tras el shutdown().
+        from melee.slippstream import SlippstreamClient
+        console._slippstream = SlippstreamClient(console.slippi_address, console.slippi_port)
         
     if not connected:
-        print("❌ Error: No se pudo conectar a Dolphin.")
+        print("❌ Error: No se pudo conectar a Dolphin después de 24 intentos.")
+        print("   Verifica que Dolphin esté corriendo y que la ISO sea válida.")
         sys.exit(1)
         
     print("🎮 Conectando controlador de GameCube P1 (Mosca - Luigi)...")
@@ -477,6 +851,9 @@ def run_fly_vs_human(dolphin_path=None, iso_path=None, cpu_level=None, fly_chara
                         console._slippstream.shutdown()
                     except Exception:
                         pass
+                    # Recrear el SlippstreamClient porque shutdown() destruye el worker
+                    from melee.slippstream import SlippstreamClient
+                    console._slippstream = SlippstreamClient(console.slippi_address, console.slippi_port)
                     try:
                         if console.connect():
                             print(f"✅ ¡Reconexión exitosa a Dolphin (intento {attempt})! Reanudando...")

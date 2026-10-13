@@ -5,13 +5,33 @@ Simula un escenario de combate de Super Smash Bros. Melee y visualiza la activid
 """
 import sys
 import os
+import platform
+
+# ==============================================================================
+# Comprobación de Sistema Operativo (Linux o Windows - No incluye Mac)
+# ==============================================================================
+CURRENT_OS = platform.system()
+if CURRENT_OS == "Linux":
+    IS_LINUX = True
+    IS_WINDOWS = False
+elif CURRENT_OS == "Windows":
+    IS_LINUX = False
+    IS_WINDOWS = True
+else:
+    raise OSError(f"Sistema operativo no soportado: '{CURRENT_OS}'. Solo se admite Linux o Windows.")
 
 try:
     import numpy as np
 except ImportError:
-    venv_python = "/home/ltar/.venvs/pytorch/bin/python"
-    if os.path.exists(venv_python) and sys.executable != venv_python:
-        os.execv(venv_python, [venv_python] + sys.argv)
+    candidates = [
+        os.path.join(os.path.dirname(__file__), ".venv", "bin", "python"),
+        "/home/ltar/.venvs/pytorch/bin/python",
+    ]
+    if IS_WINDOWS:
+        candidates.insert(0, os.path.join(os.path.dirname(__file__), ".venv", "Scripts", "python.exe"))
+    for venv_python in candidates:
+        if os.path.exists(venv_python) and sys.executable != venv_python:
+            os.execv(venv_python, [venv_python] + sys.argv)
     raise
 
 import time

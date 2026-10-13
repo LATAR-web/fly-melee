@@ -1,14 +1,31 @@
 import sys
 import os
+import platform
+
+# ==============================================================================
+# Comprobación de Sistema Operativo (Linux o Windows - No incluye Mac)
+# ==============================================================================
+CURRENT_OS = platform.system()
+if CURRENT_OS == "Linux":
+    IS_LINUX = True
+    IS_WINDOWS = False
+elif CURRENT_OS == "Windows":
+    IS_LINUX = False
+    IS_WINDOWS = True
+else:
+    raise OSError(f"Sistema operativo no soportado: '{CURRENT_OS}'. Este proyecto solo admite Linux o Windows.")
 
 try:
     import numpy as np
     import scipy.sparse as sp
 except ImportError:
-    for venv_python in [
+    candidates = [
         os.path.join(os.path.dirname(__file__), ".venv", "bin", "python"),
         "/home/ltar/.venvs/pytorch/bin/python",
-    ]:
+    ]
+    if IS_WINDOWS:
+        candidates.insert(0, os.path.join(os.path.dirname(__file__), ".venv", "Scripts", "python.exe"))
+    for venv_python in candidates:
         if os.path.exists(venv_python) and sys.executable != venv_python:
             os.execv(venv_python, [venv_python] + sys.argv)
     raise
@@ -156,8 +173,20 @@ class FlyBrain:
       - Cluster 7 (345,751..395,143): Red Cerebelar de Combos, Tech-Chase y Control de Escenario
     Controlador neuronal competitivo de nivel SSS para Luigi y Fox McCloud en Super Smash Bros Melee.
     """
-    def __init__(self, data_dir="/home/ltar/projects/fly-melee/data", decay=0.88, threshold=1.0, refractory_period=2, lightweight=False):
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir=None, decay=0.88, threshold=1.0, refractory_period=2, lightweight=False):
+        if data_dir is None:
+            default_linux = Path("/home/ltar/projects/fly-melee/data")
+            local_data = Path(__file__).resolve().parent / "data"
+            if IS_LINUX and default_linux.exists():
+                self.data_dir = default_linux
+            else:
+                self.data_dir = local_data
+        else:
+            p = Path(data_dir)
+            if str(p) == "/home/ltar/projects/fly-melee/data" and not p.exists():
+                self.data_dir = Path(__file__).resolve().parent / "data"
+            else:
+                self.data_dir = p
         self.decay = decay
         self.threshold = threshold
         self.refractory_period = refractory_period

@@ -6,10 +6,12 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Detectar entorno virtual de Python
 if [ -f "$DIR/.venv/bin/python" ]; then
   PYTHON="$DIR/.venv/bin/python"
-elif [ -f "/home/ltar/.venvs/pytorch/bin/python" ]; then
-  PYTHON="/home/ltar/.venvs/pytorch/bin/python"
+elif [ -f "$DIR/.venv/Scripts/python.exe" ]; then
+  PYTHON="$DIR/.venv/Scripts/python.exe"
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON="python"
 else
   echo "❌ Error: No se encontró Python 3 instalado."
   echo "   Instálalo y crea un entorno virtual con:"
@@ -48,6 +50,7 @@ elif [ "$1" == "3" ]; then
 elif [ "$1" == "5" ] || [ "$1" == "--lightweight" ] || [ "$1" == "-l" ]; then
   CHOICE="5"
 elif [ $# -gt 0 ]; then
+  "$PYTHON" "$DIR/fast_download.py"
   if ! pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
     nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
     sleep 1
@@ -118,14 +121,17 @@ case "$CHOICE" in
     ;;
 esac
 
-# 1. Iniciar servidor de telemetría web en segundo plano
+# 1. Verificar y asegurar la existencia de la ISO de Melee
+"$PYTHON" "$DIR/fast_download.py"
+
+# 2. Iniciar servidor de telemetría web en segundo plano
 if ! pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
   echo "🌐 Iniciando servidor web de telemetría (http://localhost:8085)..."
   nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
   sleep 1
 fi
 
-# 2. Abrir navegador
+# 3. Abrir navegador
 echo "🌐 Abriendo visualizador web en el navegador..."
 if command -v xdg-open > /dev/null 2>&1; then
   nohup xdg-open "$URL" >/dev/null 2>&1 &
@@ -133,7 +139,7 @@ elif command -v open > /dev/null 2>&1; then
   nohup open "$URL" >/dev/null 2>&1 &
 fi
 
-# 3. Lanzar emulador Dolphin con el juego Melee y la Mosca
+# 4. Lanzar emulador Dolphin con el juego Melee y la Mosca
 echo "🚀 Abriendo emulador Dolphin con Super Smash Bros. Melee..."
 while true; do
   if [ -f "$DEFAULT_ISO" ]; then

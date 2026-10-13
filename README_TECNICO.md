@@ -17,7 +17,7 @@ Documentación técnica, matemática y de ingeniería de sistemas sobre la integ
 9. [Barrera de Seguridad Fail-Safe y Prevención Matemática de Suicidios](#9-barrera-de-seguridad-fail-safe-y-prevención-matemática-de-suicidios)
 10. [Plasticidad Sináptica en Línea (STDP) y Modelado Bayesiano de Hábitos](#10-plasticidad-sináptica-en-línea-stdp-y-modelado-bayesiano-de-hábitos)
 11. [Arquitectura de Ejecución Frame-a-Frame Slippi y Concurrencia Desacoplada](#11-arquitectura-de-ejecución-frame-a-frame-slippi-y-concurrencia-desacoplada)
-12. [Batería de Pruebas Unitarias y Benchmarks Empíricos (81/81)](#12-batería-de-pruebas-unitarias-y-benchmarks-empíricos-8181)
+12. [Batería de Pruebas Unitarias y Benchmarks Empíricos (103/103)](#12-batería-de-pruebas-unitarias-y-benchmarks-empíricos-103103)
 
 ---
 
@@ -139,15 +139,33 @@ Cada librería del stack fue seleccionada bajo estrictas restricciones de latenc
 - **Problema**: Los eventos Slippi generan streams de datos complejos en cada frame. Parsear texto JSON estándar en Python requiere escanear strings ASCII y convertir caracteres a flotantes, consumiendo hasta $3.5\text{ ms}$ por tick.
 - **Solución**: Universal Binary JSON (UBJSON) almacena tipos y números binarios directos (IEEE 754 float32 / int32). La extensión `py-ubjson` compilada en C deserializa estos paquetes en microsegundos sin tocar el heap de Python.
 
-### 6. `evdev` (>=1.6): Interfaz Directa con el Kernel de Linux para Mandos
-- **Problema**: Las capas de eventos genéricas como Pygame o SDL2 agregan abstracciones de cola y buffers de ventana X11/Wayland.
-- **Solución**: `evdev` se comunica directamente con los nodos de dispositivo `/dev/input/event*` del kernel de Linux mediante llamadas del sistema `ioctl()`. En adaptadores de GameCube con overclock (como Mayflash o el adaptador oficial de Wii U a 1000Hz con polling de 1ms), `evdev` procesa las entradas físicas del jugador humano con latencia submilisegundo.
+### 6. Mandos de Entrada: `evdev` (Linux) y `pygame` / `XInput` / `DirectInput` (Windows)
+- **En Linux (`evdev` >=1.6)**: Se comunica directamente con los nodos de dispositivo `/dev/input/event*` del kernel de Linux mediante llamadas del sistema `ioctl()`. En adaptadores de GameCube con overclock (como Mayflash o el adaptador oficial de Wii U a 1000Hz con polling de 1ms), `evdev` procesa las entradas físicas del jugador humano con latencia submilisegundo.
+- **En Windows (`pygame` >=2.5.0, `XInput` y `WinMM DirectInput` vía `ctypes`)**: En Windows se implementa una arquitectura híbrida de detección de mandos:
+  1. Si `pygame` está disponible, inicializa el subsistema joystick para leer cualquier gamepad USB / Bluetooth.
+  2. Implementa acceso de bajo nivel nativo a las DLLs de Windows (`xinput1_4.dll`, `xinput1_3.dll`, `winmm.dll`) para leer el estado del gamepad de Xbox o DirectInput sin retrasos ni sobrecarga de capas gráficas.
+  3. Configura automáticamente el archivo `GCPadNew.ini` de Dolphin mapeando los botones físicos y sticks a los perfiles de control.
 
-### 7. `asyncio` & `threading`: Aislamiento del Bucle Biológico de 60Hz
+### 7. `psutil` (>=5.9.0): Detección y Supervisión de Procesos Dolphin Multiplataforma
+- **Problema**: Verificar si el proceso de emulación (`Slippi_Online`, `Dolphin.exe` o `Slippi Dolphin.exe`) está corriendo requiere métodos nativos del sistema.
+- **Solución**: `psutil` itera los procesos del sistema (`process_iter`) de manera no bloqueante y multiplataforma tanto en Windows como en Linux, con fallback a `pgrep` (Linux) y `tasklist` (Windows).
+
+### 8. `asyncio` & `threading`: Aislamiento del Bucle Biológico de 60Hz
 - **Problema**: El panel web 3D interactivo Three.js atiende clientes HTTP y envía telemetría WebSocket. Si se ejecutara en el mismo hilo que la mosca, la latencia de un navegador o la congestión de un socket web congelaría la simulación biológica de las 395k neuronas.
 - **Solución**:
   - Hilo principal: Ejecución estricta a 60Hz síncronos con Dolphin.
   - Hilo secundario (`dashboard_server.py`): Event loop asíncrono con `asyncio` y `aiohttp`, desacoplado mediante una cola circular de telemetría sin bloqueos (*lockless ring buffer*).
+
+### 9. Arquitectura de Sistemas Operativos: Linux & Windows Nativos (Exclusión de macOS)
+- **Compatibilidad Dual**: El código valida `platform.system()` al iniciar cada módulo:
+  - **Linux**: Utiliza pipes FIFO de Unix en `/tmp/dolphin-emu/`, `os.pwrite()` POSIX para I/O multihilo sin locks en descargas, auto-descarga de Slippi AppImage y nodos `evdev`.
+  - **Windows**:
+    - **Aprovisionamiento Automático de Slippi Dolphin**: Si no se detecta una instalación de Slippi Launcher, el sistema descarga automáticamente el paquete portable oficial de **Slippi Dolphin (Ishiiruka v3.6.4, ~11.6 MB)** desde GitHub Releases, lo descomprime en `%APPDATA%\Slippi Launcher\netplay\` y genera el archivo `Settings` requerido por `libmelee` apuntando a `data/games/ssbm.iso`.
+    - **Pipelines y Configuración Dolphin**: Utiliza rutas en `AppData/Roaming/Slippi Launcher/netplay/User/` para `Dolphin.ini`, `GCPadNew.ini` y tuberías IPC.
+    - **I/O Concurrente en Descargas**: `fast_download.py` emplea I/O binario `r+b` con bloqueos por hilo (`file_lock`) en Windows frente a `pwrite` en Linux.
+    - **Scripts PowerShell (.ps1)**: Los lanzadores (`start_fly.ps1`, `start_dolphin.ps1`, `fix_bluetooth_gamepad.ps1`) están codificados en **UTF-8 con BOM (`utf-8-sig`)** para compatibilidad nativa con Windows PowerShell 5.1/7+, con captura de excepciones en consolas no interactivas (`[Console]::KeyAvailable`) e inyección automática de `$env:PYTHONIOENCODING="utf-8"` y `$env:PYTHONUTF8="1"`.
+    - **Aislamiento de Dependencias (PEP 508)**: `requirements.txt` discrimina `evdev>=1.6.0; sys_platform == 'linux'`, evitando fallos de compilación con cabeceras faltantes de Linux en Windows y activando `psutil`, `pygame` y `pywin32`.
+  - **macOS**: Explícitamente bloqueado con `OSError` debido a incompatibilidades de bajo nivel en las tuberías de control determinista y rendimiento a 60Hz sobre Darwin.
 
 ---
 
@@ -223,7 +241,7 @@ Cuando un oponente o proyectil se aproxima a gran velocidad, el ángulo subtendi
 
 $$\frac{d\theta}{dt} = \frac{v_{\text{rel}} \cdot r}{d^2 + r^2}$$
 
-En el código de [`fly_brain.py`](file:///home/ltar/projects/fly-melee/fly_brain.py#L860-L895):
+En el código de [`fly_brain.py`](fly_brain.py):
 $$\text{looming\_rate} = \max\left(0, \frac{\text{distancia}_{t-1} - \text{distancia}_t}{\Delta t}\right)$$
 
 Si $\text{looming\_rate} > 0.35\text{ u/frame}$, se inyecta una corriente excitatoria masiva en los Clusters 0, 1 y 5:
@@ -235,15 +253,18 @@ El complejo central contiene neuronas con afinidad direccional en anillo que cal
 $$\text{edge\_dist} = \text{borde\_escenario} - |p_x|$$
 $$\text{compass\_val} = \begin{cases} 3.0, & \text{si } \text{edge\_dist} < 18.0\text{ u} \\ 1.5, & \text{en el centro} \end{cases}$$
 
+### 3. Percepción Periférica y Estimulación Multi-Amenaza (Entornos FFA)
+En partidas multijugador (Free-For-All), `stimulate_sensory()` procesa la lista completa de contrincantes activos (`opponents`). El algoritmo integra los vectores de desplazamiento angular y looming de cada rival individual en los lóbulos ópticos (Clusters 0 y 1) y en el circuito Giant Fiber (Cluster 5). Si dos o más contrincantes convergen desde direcciones opuestas, la suma combinada activa las defensas de área (*Crowd Control*).
+
 ---
 
-## 7. Neuromodulación Bioquímica: Ejes PAM (Dopamina) y PPL1 (Octopamina)
+## 7. Neuromodulación Bioquímica: Ejes PAM (Dopamina), PPL1 (Octopamina) y Endorfinas
 
-El cerebro de la mosca regula su agresividad y aversión al riesgo mediante dos neurotransmisores biológicos modelados como concentraciones continuas:
+El cerebro de la mosca regula su agresividad, aversión al riesgo y tolerancia al daño mediante neurotransmisores biológicos modelados como concentraciones continuas:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> EstadoNeutral: Dopamina=0.65, Octopamina=0.20
+    [*] --> EstadoNeutral: Dopamina=0.65, Octopamina=0.20, Endorfina=0.20
     
     EstadoNeutral --> Depredador: Conecta Golpe / KO Rival
     Depredador --> Depredador: Combo Activo (+0.30 Dopamina)
@@ -252,11 +273,16 @@ stateDiagram-v2
     EstadoNeutral --> Supervivencia: Recibe Golpe Alto / Offstage
     Supervivencia --> Supervivencia: Peligro Crítico (+0.35 Octopamina)
     Supervivencia --> EstadoNeutral: Retorno Seguro a Pista
+
+    EstadoNeutral --> FlowState: Daño/Hitlag Recibido
+    FlowState --> FlowState: Analgesia por Endorfinas (+0.60 Endorfina)
+    FlowState --> Depredador: Activación de Flow State 20XX
 ```
 
 ### Dinámica Diferencial de Concentraciones
 $$\frac{d[\text{DA}]}{dt} = -\lambda_{\text{DA}} ([\text{DA}] - 0.65) + \sum \Delta \text{DA}_{\text{evento}}$$
 $$\frac{d[\text{OA}]}{dt} = -\lambda_{\text{OA}} ([\text{OA}] - 0.20) + \sum \Delta \text{OA}_{\text{evento}}$$
+$$\frac{d[\text{End}]}{dt} = -\lambda_{\text{End}} ([\text{End}] - 0.20) + \sum \Delta \text{End}_{\text{evento}}$$
 
 - **Dopamina PAM (Modo Depredador / Recompensa)**:
   - Se eleva al encadenar golpes (+0.12), conseguir un KO (+0.35) o castigar un whiff rival (+0.25).
@@ -264,6 +290,10 @@ $$\frac{d[\text{OA}]}{dt} = -\lambda_{\text{OA}} ([\text{OA}] - 0.20) + \sum \De
 - **Octopamina PPL1 (Modo Alarma / Supervivencia)**:
   - Se dispara ante porcentajes superiores al 90%, caída profunda fuera del escenario (+0.40) o pérdida de stock (+0.50).
   - Efecto: Inhibe ataques en falso, fuerza el uso de SDI defensivo y prioriza trayectorias de recuperación directas a la repisa.
+- **Endorfinas y Resiliencia (Flow State 20XX)**:
+  - Se liberan ante hitlag e impactos recibidos, actuando como analgésico biofísico. Mitigan el pánico, impiden la inhibición motora y activan el *Flow State 20XX* para contraataques inmediatos.
+- **Adicción a Ganar 100% (Cero Depresión tras Pérdida de Stock)**:
+  - La pérdida de un stock no induce estados de repliegue o depresión: detona el modo *Venganza Depredadora*, fijando la dopamina al $\ge 85\%$ y la octopamina al $100\%$ de inmediato, purgando penalizaciones de frame y buscando el desquite sin titubeos.
 
 ---
 
@@ -292,20 +322,39 @@ $$\text{Spikes}_{C_k} = \sum_{j \in C_k} S_j(t)$$
      - *Luigi*: `🧠 CEREBELLAR COMBO EXTENSION: WAVEDASH DOWN-TILT LAUNCHER`, proyectando al rival hacia arriba para confirms aéreos.
      - *Fox*: `🧠 CEREBELLAR COMBO EXTENSION: FOX RUNNING JC UP-SMASH`.
 
+### Inteligencia FFA Multi-Bot y Target Selection IQ
+En combates con múltiples contrincantes simultáneos, `select_best_target()` calcula una puntuación heurística dinámica para cada oponente:
+$$\text{Score}(p) = w_d \cdot (100 - d_{\text{euclid}}) + w_v \cdot \text{Vulnerabilidad}(p) - w_h \cdot \mathbb{I}(p \in \text{Halo/Invulnerable})$$
+- Descarta oponentes muertos o en plataforma de respawn con invulnerabilidad (`REBIRTH_WAIT`).
+- Transiciona instantáneamente hacia el objetivo vivo prioritario sin ejecutar burlas (taunts) ni congelarse mientras haya rivales activos.
+
+### Anti-Pinch Crowd Control (Ruptura de Emboscadas 360°)
+Si la mosca detecta que está flanqueada por adversarios a ambos lados ($x_1 < x_{\text{fly}} < x_2$) en un rango crítico:
+- **Luigi**: Detona `Rising Cyclone 360°` (vórtice multihit de área) o `Down-Smash Semi-Spike` que barre simultáneamente hacia ambos lados.
+- **Fox**: Detona `Shine 360° Frame-1` para reflejar proyectiles y repeler a ambos agresores de forma instantánea.
+
+### Precisión CQC y Cero Whiffs Erráticos
+- **Jab Rápido Frame-2**: En rango ultra-cercano ($d \le 4.5\text{ u}$), conecta un Jab Frame-2 de interrupción inmediata.
+- **Cero Ataques a la Nada**: Validación estricta de alcance espacial; la mosca jamás lanza ataques aéreos al aire ni arriesga Up-B al vacío cuando el contrincante no se encuentra en radio de impacto alcanzable.
+
 ---
 
 ## 9. Barrera de Seguridad Fail-Safe y Prevención Matemática de Suicidios
 
-En Melee, la física del juego castiga severamente los errores analógicos: Luigi tiene tracción mínima ($0.005$) y entra en `SPECIAL_FALL` indefenso si ejecuta un Green Missile al abismo. Para evitar suicidios accidentales, todas las salidas motoras pasan por [`_enforce_safety()`](file:///home/ltar/projects/fly-melee/fly_brain.py#L1040-L1180):
+En Melee, la física del juego castiga severamente los errores analógicos: Luigi tiene tracción mínima ($0.005$) y entra en `SPECIAL_FALL` indefenso si ejecuta un Green Missile al abismo. Para evitar suicidios accidentales, todas las salidas motoras pasan por [`_enforce_safety()`](fly_brain.py):
 
 ### Invariantes de Seguridad Garantizados
 1. **Pista de Seguridad de Borde (Runway Barrier)**:
    - Si $|p_x| \ge \text{stage\_edge} - 14.0\text{ u}$ y la velocidad horizontal se orienta al abismo, la barrera neutraliza el stick ($X \leftarrow 0.5$) y fuerza agacharse ($Y \leftarrow 0.0$), ejecutando un Crouch Cancel que detiene a Luigi o Fox en seco antes de caer.
-2. **Garantía Cero Suicidios con Green Missile (Side-B)**:
+2. **Pista Mínima de Wavedash (45 unidades)**:
+   - Debido a la fricción mínima ($0.005$) de Luigi, cualquier Wavedash terrestre hacia la orilla exige un margen horizontal libre de al menos **45 unidades**. Si la distancia disponible es menor, el comando de Wavedash es neutralizado, sustituyéndolo por control de esquina con bolas de fuego o neutral terrestre seguro.
+3. **Garantía Cero Suicidios con Green Missile (Side-B)**:
    - En Melee, una Bola de Fuego (`Neutral-B`) requiere **estrictamente** $X = 0.5, Y = 0.5$. Si el stick analógico se inclina a $X = 1.0$ o $X = 0.0$, el motor ejecuta un Green Missile (`Side-B`).
-   - La barrera fuerza invariablemente $X = 0.5$ en todas las bolas de fuego y veta por completo el uso de Side-B terrestre cerca del abismo.
-3. **Conversión de Caída Libre Indefensa**:
-   - Si la mosca está en el aire sobre el escenario, la barrera veta comandos de recuperación profunda (Up-B aéreo) para evitar caer en freefall indefenso, convirtiendo el comando en un ataque aéreo seguro (N-Air / Up-Air).
+   - La barrera fuerza invariablemente $X = 0.5$ en todas las bolas de fuego terrestres y restringe el uso de Side-B aéreo únicamente como opción de recuperación horizontal alta con ángulo de retorno seguro.
+4. **Descenso Vertical Protegido de Halo Platform (Post-Respawn)**:
+   - Tras reaparecer en la plataforma halo, el descenso se realiza de forma estrictamente vertical ($X = 0.5, Y = 0.0$) directo hacia la superficie segura del escenario, vetando esquivas aéreas diagonales accidentales hacia el abismo.
+5. **Controlador Edge-Triggered & Mashing 30Hz**:
+   - Para elevar el Rising Cyclone, el pipeline procesa transiciones por flancos (press/release) a 30Hz sin desbordar las colas de eventos ni bloquear comandos sostenidos.
 
 ---
 
@@ -326,7 +375,7 @@ El cerebro modela la probabilidad condicional de las decisiones del oponente:
 - Respuestas en escudo: $P(\text{Roll OoS}), P(\text{Grab OoS}), P(\text{Attack OoS})$.
 
 Los parámetros aprendidos se guardan atómicamente en formato JSON persistente en:
-[`data/memory/long_term_synapses.json`](file:///home/ltar/projects/fly-melee/data/memory/long_term_synapses.json)
+[`data/memory/long_term_synapses.json`](data/memory/long_term_synapses.json)
 
 ---
 
@@ -352,14 +401,43 @@ sequenceDiagram
     end
 ```
 
+### 1. Pipeline de Inicialización y Arranque Multiplataforma (`start_fly.sh` / `start_fly.ps1`)
+El arranque del ecosistema está automatizado y desacoplado según el sistema operativo anfitrión:
+- **Detección Automática de Entorno**:
+  - En Linux ([`start_fly.sh`](start_fly.sh)): Prioriza `.venv/bin/python`, con fallback a `python3` y `python` (compatible con Git Bash / MSYS2).
+  - En Windows ([`start_fly.ps1`](start_fly.ps1)): Prioriza `.venv\Scripts\python.exe`, `$env:VIRTUAL_ENV` y ejecutables en el `PATH` del sistema.
+- **Verificación Previa y Descarga Acelerada de ISO ([`fast_download.py`](fast_download.py))**:
+  - Antes de inicializar servicios o Dolphin, ambos scripts invocan [`fast_download.py`](fast_download.py).
+  - Comprueba atómicamente la existencia y el tamaño exacto de la ISO oficial en `data/games/ssbm.iso` (1,459,978,240 bytes); si es válida, finaliza en menos de 0.02s sin transferencias de red innecesarias.
+  - Si el archivo no existe o se encuentra incompleto, procede automáticamente a su descarga con 16 conexiones concurrentes (cabeceras `Range: bytes`), pre-asignación y escritura directa (`os.pwrite()` en Linux o I/O binario `r+b` en Windows), respaldado por un archivo temporal `.part` que previene corrupciones ante cancelaciones.
+- **Lanzamiento Asíncrono del Servidor Web**:
+  - Verifica si [`dashboard_server.py`](dashboard_server.py) ya se encuentra activo (mediante `pgrep` en Linux o consulta CIM/WMI `Win32_Process` en Windows).
+  - Si no está activo, lo levanta en segundo plano en el puerto 8085 de forma transparente y abre el visualizador 3D en el navegador web predeterminado (`xdg-open` / `Start-Process`).
+- **Inyección y Configuración de Dolphin**:
+  - [`fly_melee.py`](fly_melee.py) autoconfigura `Dolphin.ini` y `GCPadNew.ini` en el directorio de usuario de Dolphin (`~/.config/SlippiOnline` en Linux o `AppData/Roaming/SlippiOnline` en Windows).
+  - Asigna el Puerto 1 a la Mosca mediante Pipe virtual (`Pipe/0/slippibot1`) y el Puerto 2 al jugador humano (Gamepad USB/Bluetooth o Teclado con mappings analógicos).
+- **Ciclo de Ejecución Determinista**:
+  - Dolphin y libmelee operan a 60 Hz exactos inyectando memoria frame a frame, con un bucle interactivo de reinicio al terminar cada partida.
+
+### 2. Ecosistema de Herramientas y Scripts (`start_dolphin` y `fix_bluetooth_gamepad`)
+- **Menú de Control Integral ([`start_dolphin.sh`](start_dolphin.sh) / [`start_dolphin.ps1`](start_dolphin.ps1))**:
+  - Orquesta lanzamientos rápidos contra bots de CPU (`--cpu 9`), partidas humanas, entrenamiento masivo multihilo con [`train_fly.py`](train_fly.py), pruebas biológicas en tiempo real con [`test_fly_brain.py`](test_fly_brain.py) e inspección / descarga de ISO de alto rendimiento con [`fast_download.py`](fast_download.py).
+- **Diagnóstico y Calibración de Mandos ([`fix_bluetooth_gamepad.sh`](fix_bluetooth_gamepad.sh) / [`fix_bluetooth_gamepad.ps1`](fix_bluetooth_gamepad.ps1))**:
+  - En Linux: Ajusta `/etc/bluetooth/input.conf` (`ClassicBondedOnly=false`) y reinicia el servicio BlueZ para admitir gamepads Android/clones.
+  - En Windows: Abre el panel de control nativo `joy.cpl`, la interfaz `ms-settings:bluetooth`, supervisa el servicio `bthserv` e interactúa con [`detect_controller.py`](detect_controller.py) para autoconfigurar XInput o DirectInput en Dolphin.
+
 ---
 
-## 12. Batería de Pruebas Unitarias y Benchmarks Empíricos (81/81)
+## 12. Batería de Pruebas Unitarias y Benchmarks Empíricos (103/103)
 
-La suite de validación continua en [`verify_fixes.py`](file:///home/ltar/projects/fly-melee/verify_fixes.py) evalúa los 81 requerimientos del sistema sin margen de error:
+La suite de validación continua en [`verify_fixes.py`](verify_fixes.py) evalúa los **103 requerimientos del sistema** sin margen de error:
 
 ```bash
-/home/ltar/.venvs/pytorch/bin/python verify_fixes.py
+# En Linux:
+python3 verify_fixes.py
+
+# En Windows:
+python verify_fixes.py
 ```
 
 ### Tabla Resumen de Verificación
@@ -371,15 +449,18 @@ La suite de validación continua en [`verify_fixes.py`](file:///home/ltar/projec
 | **Tests 31–50** | Mecánicas Físicas | L-Cancel automático, Wiggle-out de tumble, geometría de los 6 escenarios legales. | ✅ SUPERADO |
 | **Tests 51–65** | Arsenal de Luigi | Tracción 0.005, Shoryuken Kill Confirm (frame-8 PING!), Rising Cyclone mashing. | ✅ SUPERADO |
 | **Tests 66–76** | Técnicas Avanzadas 20XX | Ledge-roll invencible, Shield Drop en plataformas, Edge-Cancel slide, Mash-Out 60/s. | ✅ SUPERADO |
-| **Test 77** | Luigi B-Air Wall | Buferizado de `AERIAL_BAIR` en salto corto con patada trasera dropkick. | ✅ SUPERADO |
-| **Test 78** | Luigi Ledge-Stall | Regrab invencible en repisa al superar 26 frames, refrescando intangibilidad. | ✅ SUPERADO |
-| **Test 79** | Luigi Down-Tilt Launcher | Wavedash Down-Tilt a ras de suelo para pop-up vertical hacia combos aéreos. | ✅ SUPERADO |
-| **Test 80** | Modulación por Clusters | Disparo directo guiado por espigas en Cluster 5 (saccade), 6 (shine OoS) y 7 (combos). | ✅ SUPERADO |
-| **Test 81** | Simulación a 60Hz Nativos | Verificación estricta de `brain.step(current)` ejecutándose en cada frame sin throttle. | ✅ SUPERADO |
+| **Tests 77–81** | Microarquitectura Biológica | B-Air Wall, Ledge-Stall invencible, Down-Tilt Launcher, modulación por clusters y simulación 60Hz. | ✅ SUPERADO |
+| **Tests 82–85** | Pistas, I/O y Descenso | Ataque en bordes, cero suicidios offstage/anti-ceiling, I/O asíncrono con caché y drop-through seguro. | ✅ SUPERADO |
+| **Tests 86–89** | Flow State & Neutral Quirúrgico | Endorfinas/analgesia, Jab Frame-2 CQC, cero ataques erráticos a la nada y castigo a rival en freefall. | ✅ SUPERADO |
+| **Tests 90–95** | Blindaje Anti-Suicidio Total | Cero Wavedash offstage, edgeguard terrestre seguro, Up-B dirigido, neutralización en muerte y descenso de halo. | ✅ SUPERADO |
+| **Tests 96–100** | Adicción a Ganar & Mashing 30Hz | Modo venganza sin depresión, purga de fobias, controlador edge-triggered 30Hz, Green Missile y pista de 45u. | ✅ SUPERADO |
+| **Test 101** | Target Selection IQ en FFA | Selección dinámica del rival vivo prioritario en partidas multi-bot, ignorando halos invulnerables. | ✅ SUPERADO |
+| **Test 102** | Anti-Pinch Crowd Control | Despeje de emboscadas 360° con Luigi Cyclone / Down-Smash semi-spike o Fox Shine 360° Frame-1. | ✅ SUPERADO |
+| **Test 103** | Multi-Bot Re-Targeting | Transición instantánea de objetivo en FFA y cero burlas/taunts si quedan rivales vivos en el combate. | ✅ SUPERADO |
 
 ```text
 ======================================================================
-🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (81/81 SUPERADAS)
+🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO! (103/103 SUPERADAS)
 ======================================================================
 ```
 
@@ -394,6 +475,6 @@ La suite de validación continua en [`verify_fixes.py`](file:///home/ltar/projec
 ---
 
 ## 📚 Enlaces Relacionados
-- [**DICCIONARIO_TECNICO.md**](file:///home/ltar/projects/fly-melee/DICCIONARIO_TECNICO.md): Glosario y enciclopedia de términos de neurociencia, tensores CSC, hardware y Melee 20XX de la A a la Z.
-- [**README.md**](file:///home/ltar/projects/fly-melee/README.md): Guía de instalación, inicio rápido y configuración del emulador Dolphin y panel web 3D.
-- [**verify_fixes.py**](file:///home/ltar/projects/fly-melee/verify_fixes.py): Suite de pruebas de integración y verificación continua.
+- [**DICCIONARIO_TECNICO.md**](DICCIONARIO_TECNICO.md): Glosario y enciclopedia de términos de neurociencia, tensores CSC, hardware y Melee 20XX de la A a la Z.
+- [**README.md**](README.md): Guía de instalación, inicio rápido y configuración del emulador Dolphin y panel web 3D.
+- [**verify_fixes.py**](verify_fixes.py): Suite de pruebas de integración y verificación continua.

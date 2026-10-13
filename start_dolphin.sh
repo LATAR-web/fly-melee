@@ -6,10 +6,12 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Detectar entorno virtual de Python
 if [ -f "$DIR/.venv/bin/python" ]; then
   PYTHON="$DIR/.venv/bin/python"
-elif [ -f "/home/ltar/.venvs/pytorch/bin/python" ]; then
-  PYTHON="/home/ltar/.venvs/pytorch/bin/python"
+elif [ -f "$DIR/.venv/Scripts/python.exe" ]; then
+  PYTHON="$DIR/.venv/Scripts/python.exe"
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON="python"
 else
   echo "❌ Error: No se encontró Python 3 instalado."
   exit 1
