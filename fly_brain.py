@@ -3962,6 +3962,12 @@ class FlyBrain:
                     self.dopamine = 1.0
                     self.last_luigi_power = "UPB_SHORYUKEN"
                     self.learn_from_success("KO")
+                    if dy > 1.8:
+                        return self._enforce_safety({
+                            "name": "💥 COMBO SUPREMO SHORYUKEN: D-THROW ➔ SHORT-HOP SWEETSPOT UP-B KILL CONFIRM (PING!)",
+                            "jump": True, "attack": False, "special": True, "shield": False, "grab": False,
+                            "stick_x": float(towards_opp), "stick_y": 1.0, "c_stick_x": 0.5, "c_stick_y": 0.5, "stats": stats
+                        }, player, opponent, stage_edge=stage_edge)
                     return self._enforce_safety({
                         "name": "💥 COMBO SUPREMO SHORYUKEN: D-THROW ➔ SWEETSPOT UP-B KILL CONFIRM (PING!)",
                         "jump": False, "attack": False, "special": True, "shield": False, "grab": False,

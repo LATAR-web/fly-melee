@@ -40,6 +40,7 @@ case $OPT in
     if ! pgrep -f "dashboard_server.py" > /dev/null; then
       echo "Iniciando visualizador 3D en segundo plano..."
       nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
+      disown || true
       sleep 1
     fi
     nohup xdg-open "http://localhost:8085" >/dev/null 2>&1 &
@@ -71,6 +72,7 @@ case $OPT in
     if ! pgrep -f "dashboard_server.py" > /dev/null; then
       echo "Iniciando visualizador 3D en segundo plano..."
       nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
+      disown || true
       sleep 1
     fi
     nohup xdg-open "http://localhost:8085" >/dev/null 2>&1 &

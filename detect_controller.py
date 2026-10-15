@@ -33,10 +33,14 @@ if IS_LINUX:
     try:
         import evdev
     except ImportError:
-        venv_python = "/home/ltar/.venvs/pytorch/bin/python"
-        if os.path.exists(venv_python) and sys.executable != venv_python:
-            script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
-            os.execv(venv_python, [venv_python] + sys.argv[1:])
+        venv_candidates = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python"),
+            "/home/ltar/.venvs/pytorch/bin/python",
+        ]
+        for venv_python in venv_candidates:
+            if os.path.exists(venv_python) and sys.executable != venv_python:
+                script = os.path.abspath(__file__) if "__file__" in globals() else sys.argv[0]
+                os.execv(venv_python, [venv_python] + sys.argv[1:])
 elif IS_WINDOWS:
     venv_win = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "Scripts", "python.exe")
     if os.path.exists(venv_win) and sys.executable.lower() != venv_win.lower():

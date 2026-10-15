@@ -22,5 +22,5 @@ evdev>=1.6.0; sys_platform == 'linux'
 # Dependencias para compatibilidad con Windows (Detección de procesos y mandos)
 # ==============================================================================
 psutil>=5.9.0
-pygame>=2.5.0
+pygame>=2.5.0; sys_platform == 'win32'
 

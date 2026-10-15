@@ -29,6 +29,7 @@ if [ "$1" == "--web" ] || [ "$1" == "4" ]; then
   echo "🌐 Iniciando solo panel web en $URL ..."
   if ! pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
     nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
+    disown || true
     sleep 2
   fi
   if command -v xdg-open > /dev/null 2>&1; then
@@ -128,6 +129,7 @@ esac
 if ! pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
   echo "🌐 Iniciando servidor web de telemetría (http://localhost:8085)..."
   nohup "$PYTHON" "$DIR/dashboard_server.py" >/dev/null 2>&1 &
+  disown || true
   sleep 1
 fi
 

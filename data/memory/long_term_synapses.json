@@ -1,10 +1,10 @@
 {
   "version": 1.4,
-  "matches_played": 2070,
-  "matches_won": 2112,
-  "total_kos": 6875,
+  "matches_played": 3169,
+  "matches_won": 3216,
+  "total_kos": 10461,
   "total_deaths": 0,
-  "total_combos": 13493,
+  "total_combos": 16703,
   "edge_fear": 1.0,
   "synaptic_plasticity": {
     "win_addiction": 5.0,
@@ -36,41 +36,125 @@
   },
   "matchup_intelligence": {
     "FALCO": {
-      "matches": 1,
-      "wins": 1,
-      "kos": 4,
-      "combos": 3,
-      "mastery": 1.54
+      "matches": 106,
+      "wins": 106,
+      "kos": 424,
+      "combos": 456,
+      "mastery": 5.0
     },
     "FOX": {
-      "matches": 1,
-      "wins": 1,
-      "kos": 4,
-      "combos": 4,
-      "mastery": 1.54
+      "matches": 120,
+      "wins": 120,
+      "kos": 480,
+      "combos": 511,
+      "mastery": 5.0
     },
     "PEACH": {
-      "matches": 1,
-      "wins": 1,
-      "kos": 4,
-      "combos": 4,
-      "mastery": 1.54
+      "matches": 69,
+      "wins": 69,
+      "kos": 276,
+      "combos": 314,
+      "mastery": 4.26
+    },
+    "JIGGLYPUFF": {
+      "matches": 71,
+      "wins": 71,
+      "kos": 284,
+      "combos": 320,
+      "mastery": 4.34
+    },
+    "PIKACHU": {
+      "matches": 55,
+      "wins": 55,
+      "kos": 220,
+      "combos": 192,
+      "mastery": 3.7
+    },
+    "MARTH": {
+      "matches": 85,
+      "wins": 85,
+      "kos": 340,
+      "combos": 298,
+      "mastery": 4.9
+    },
+    "GANONDORF": {
+      "matches": 61,
+      "wins": 61,
+      "kos": 244,
+      "combos": 217,
+      "mastery": 3.94
+    },
+    "DONKEY_KONG": {
+      "matches": 53,
+      "wins": 53,
+      "kos": 212,
+      "combos": 189,
+      "mastery": 3.62
+    },
+    "SAMUS": {
+      "matches": 67,
+      "wins": 67,
+      "kos": 268,
+      "combos": 307,
+      "mastery": 4.18
+    },
+    "FALCON": {
+      "matches": 102,
+      "wins": 102,
+      "kos": 408,
+      "combos": 456,
+      "mastery": 5.0
+    },
+    "LUIGI": {
+      "matches": 60,
+      "wins": 60,
+      "kos": 240,
+      "combos": 216,
+      "mastery": 3.9
+    },
+    "DOC": {
+      "matches": 70,
+      "wins": 70,
+      "kos": 280,
+      "combos": 249,
+      "mastery": 4.3
+    },
+    "SHEIK": {
+      "matches": 71,
+      "wins": 71,
+      "kos": 284,
+      "combos": 251,
+      "mastery": 4.34
+    },
+    "BOWSER": {
+      "matches": 55,
+      "wins": 55,
+      "kos": 220,
+      "combos": 192,
+      "mastery": 3.7
+    },
+    "YOSHI": {
+      "matches": 53,
+      "wins": 53,
+      "kos": 212,
+      "combos": 185,
+      "mastery": 3.62
     }
   },
   "opponent_habits": {
-    "tech_roll_away": 11,
-    "tech_roll_in": 27,
+    "tech_roll_away": 975,
+    "tech_roll_in": 523,
     "tech_in_place": 3,
-    "missed_tech": 972,
-    "ledge_attack_freq": 75,
+    "missed_tech": 1652,
+    "ledge_attack_freq": 80,
     "ledge_roll_freq": 17,
     "ledge_jump_freq": 6,
     "ledge_getup_freq": 9,
-    "shield_habit": 0.0015746872743199873,
-    "cqc_attack_freq": 2417,
-    "cqc_shield_freq": 234,
+    "shield_habit": 0.0011922603400764636,
+    "cqc_attack_freq": 4717,
+    "cqc_shield_freq": 243,
     "cqc_roll_freq": 0,
-    "jump_after_hitstun": 202
+    "jump_after_hitstun": 218
   },
   "learned_errors": {
     "offstage_falls": 0,
